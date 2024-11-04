@@ -5,19 +5,16 @@
 
 import omni.isaac.lab.sim as sim_utils
 from omni.isaac.lab.sim.spawners import materials
-from omni.isaac.lab.actuators import ImplicitActuatorCfg
 from omni.isaac.lab.assets import ArticulationCfg, AssetBaseCfg
 from omni.isaac.lab.envs import ManagerBasedRLEnvCfg
 from omni.isaac.lab.managers import EventTermCfg as EventTerm
 from omni.isaac.lab.managers import ObservationGroupCfg as ObsGroup
 from omni.isaac.lab.managers import ObservationTermCfg as ObsTerm
 from omni.isaac.lab.managers import RewardTermCfg as RewTerm
-from omni.isaac.lab.managers import SceneEntityCfg
 from omni.isaac.lab.managers import TerminationTermCfg as DoneTerm
 from omni.isaac.lab.scene import InteractiveSceneCfg
 from omni.isaac.lab.terrains import TerrainImporterCfg
 from omni.isaac.lab.utils import configclass
-from omni.isaac.lab.markers import VisualizationMarkersCfg
 
 from socnav_sim.assets.smpl_humanoid import SMPL_HUMANOID_CFG
 import socnav_sim.tasks.amp.smpl_humanoid.mdp as mdp
@@ -51,22 +48,10 @@ class SmplHumanoidSceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
 
-    # markers
-    path = VisualizationMarkersCfg(
-        prim_path="/World/Visuals/testMarkers",
-        markers={
-            "marker1": sim_utils.SphereCfg(
-                radius=1.0,
-                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0)),
-            ),
-        }
-    )
-
 
 ##
 # MDP settings
 ##
-
 
 @configclass
 class CommandsCfg:
@@ -80,8 +65,8 @@ class CommandsCfg:
 class ActionsCfg:
     """Action specifications for the MDP."""
 
-    joint_pos = mdp.JointPositionActionCfg(
-        asset_name="robot", joint_names=[".*"], scale=3.1416, use_default_offset=True, offset=0.0,
+    joint_pos = mdp.JointPositionActionPacerCfg(
+        asset_name="robot", joint_names=[".*"], scale=3.1416, offset=1.0,
     )
 
 
@@ -109,18 +94,9 @@ class EventCfg:
     """Configuration for events."""
 
     reset_base = EventTerm(
-        func=mdp.reset_root_state_uniform,
+        func=mdp.reset_root_state_motion,
         mode="reset",
         params={"pose_range": {}, "velocity_range": {}},
-    )
-
-    reset_robot_joints = EventTerm(
-        func=mdp.reset_joints_by_offset,
-        mode="reset",
-        params={
-            "position_range": (-0.2, 0.2),
-            "velocity_range": (-0.1, 0.1),
-        },
     )
 
 

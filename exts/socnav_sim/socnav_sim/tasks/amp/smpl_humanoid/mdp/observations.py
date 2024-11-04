@@ -23,16 +23,16 @@ height_conditioned = False
 num_height_points = 256
 terrain_horizontal_scale = 0.1
 
-traj_tmp = torch.tensor([[[0.2, 0.2, 0.],
-                         [0.4, 0.4, 0.],
-                         [0.6, 0.6, 0.],
-                         [0.8, 0.8, 0.],
-                         [1.0, 1.0, 0.],
-                         [1.2, 1.2, 0.],
-                         [1.4, 1.4, 0.],
-                         [1.6, 1.6, 0.],
-                         [1.8, 1.8, 0.],
-                         [2.0, 2.0, 0.],],]).to("cuda:0")
+traj_tmp = torch.tensor([[[0.2, 0.2, 0.8],
+                         [0.4, 0.4, 0.8],
+                         [0.6, 0.6, 0.8],
+                         [0.8, 0.8, 0.8],
+                         [1.0, 1.0, 0.8],
+                         [1.2, 1.2, 0.8],
+                         [1.4, 1.4, 0.8],
+                         [1.6, 1.6, 0.8],
+                         [1.8, 1.8, 0.8],
+                         [2.0, 2.0, 0.8],],]).to("cuda:0")
 
 if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedEnv
