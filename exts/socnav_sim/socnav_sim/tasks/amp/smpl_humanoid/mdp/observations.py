@@ -104,7 +104,7 @@ def compute_task_obs(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEnti
     head_position = bodies_positions[:, asset.find_bodies('Head')[0], :]
     ground_below_head = torch.min(bodies_positions, dim=1).values[..., 2]
 
-    traj_samples = traj_tmp + root_states[:, :3]
+    traj_samples = traj_tmp.repeat(env.num_envs, 1, 1) + root_states[:, :3].unsqueeze(1).repeat(1, 10, 1)
 
     flat_head_position = head_position.view(-1, 3)
     flat_head_position[..., 2] -= ground_below_head.view(-1)
