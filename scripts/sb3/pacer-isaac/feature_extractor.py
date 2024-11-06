@@ -1,5 +1,5 @@
 import torch
-from torch import Tensor, nn
+from torch import nn
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import gymnasium as gym
 
