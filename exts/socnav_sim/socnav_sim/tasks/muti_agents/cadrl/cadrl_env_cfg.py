@@ -18,11 +18,20 @@ from omni.isaac.lab.utils import configclass
 
 from socnav_sim.assets.jackal import JACKAL_CFG
 import socnav_sim.tasks.muti_agents.cadrl.mdp as mdp
+import torch
 
 ##
 # Scene definition
 ##
 
+position=torch.tensor(
+    [[ 5.0000, -2.5000,  0.0000],
+     [ 5.0000,  2.5000,  0.0000],
+     [ 0.0000, -5.5000,  0.0000],
+     [ 0.0000,  5.5000,  0.0000],
+     [-5.0000, -2.5000,  0.0000],
+     [-5.0000,  2.5000,  0.0000]]).to('cuda:0')
+goal = torch.flip(position, dims=[0])
 
 @configclass
 class CadrlSceneCfg(InteractiveSceneCfg):
@@ -77,7 +86,7 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         """Observations for the policy."""
-        humanoid_obs = ObsTerm(func=mdp.compute_cadrl_obs)
+        humanoid_obs = ObsTerm(func=mdp.compute_cadrl_obs, params={"goal": goal[..., :2]})
 
         def __post_init__(self):
             self.enable_corruption = False
@@ -92,7 +101,7 @@ class EventCfg:
     """Configuration for events."""
 
     reset_base = EventTerm(
-        func=mdp.reset_root_state_uniform,
+        func=mdp.reset_root_state_as_circle,
         mode="reset",
         params={"pose_range": {}, "velocity_range": {}},
     )
@@ -101,8 +110,7 @@ class EventCfg:
 @configclass
 class RewardsCfg:
     """Reward terms for the MDP."""
-    
-    pass
+    reach_goal_reward = RewTerm(mdp.reach_goal, weight=1.0)
 
 
 @configclass
