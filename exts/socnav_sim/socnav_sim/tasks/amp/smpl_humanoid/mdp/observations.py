@@ -11,11 +11,8 @@ from typing import TYPE_CHECKING
 from omni.isaac.lab.assets import Articulation
 from omni.isaac.lab.managers import SceneEntityCfg
 from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.obs_utils import (
-    get_heights_with_scene,
-    compute_humanoid_observations_max,
-    init_height_points,
-    get_height_maps_jit,
-    compute_path_observations
+    compute_humanoid_observations_smpl_max,
+    obs_wxyz_to_xyzw,
 )
 
 # config params
@@ -23,100 +20,79 @@ height_conditioned = False
 num_height_points = 256
 terrain_horizontal_scale = 0.1
 
-traj_tmp = torch.tensor([[[0.2, 0.2, 0.8],
-                         [0.4, 0.4, 0.8],
-                         [0.6, 0.6, 0.8],
-                         [0.8, 0.8, 0.8],
-                         [1.0, 1.0, 0.8],
-                         [1.2, 1.2, 0.8],
-                         [1.4, 1.4, 0.8],
-                         [1.6, 1.6, 0.8],
-                         [1.8, 1.8, 0.8],
-                         [2.0, 2.0, 0.8],],]).to("cuda:0")
+body_gym_to_sim = [
+    10, 9, 11, 0, 12, 14, 19, 1, 5, 
+    13, 15, 20, 2, 6, 16, 21, 3, 7, 17, 
+    22, 4, 8, 18, 23]
 
 if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedEnv
 
 #########################################################################################
-###load_obs----->compute_obs(self, path, terrain)----->normalize_self_obs------>concat### 
+##################################### function for obs ################################## 
 #########################################################################################
-def compute_humanoid_obs(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
-                    ) -> torch.Tensor:
-    asset: Articulation = env.scene[asset_cfg.name]
+class ObsComputer():
+    def __init__(self) -> None:
+        pass
+    def compute_humanoid_obs(self, 
+                             env: ManagerBasedEnv, 
+                             asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+                        ) -> torch.Tensor:
+        asset: Articulation = env.scene[asset_cfg.name]
 
-    body_pos = asset.data.body_pos_w
-    body_rot = asset.data.body_quat_w
-    body_vel = asset.data.body_lin_vel_w
-    body_ang_vel = asset.data.body_ang_vel_w
-    root_state = asset.data.root_state_w
+        upright_config = True
+        local_root_obs_config = True
+        local_height_obs_config = False
 
-    ground_heights = get_heights_with_scene(root_state[..., :2])
+        body_pos = asset.data.body_pos_w
+        body_rot = obs_wxyz_to_xyzw(asset.data.body_quat_w)
+        body_vel = asset.data.body_lin_vel_w
+        body_ang_vel = asset.data.body_ang_vel_w
+        # gym to sim
+        body_pos = body_pos.clone()[:, body_gym_to_sim]
+        body_rot = body_rot.clone()[:, body_gym_to_sim]
+        body_vel = body_vel.clone()[:, body_gym_to_sim]
+        body_ang_vel = body_ang_vel.clone()[:, body_gym_to_sim]
 
-    obs = compute_humanoid_observations_max(
-        body_pos,
-        body_rot,
-        body_vel,
-        body_ang_vel,
-        ground_heights,
-        True,
-        True,
-        True,
-    )
+        obs = compute_humanoid_observations_smpl_max(body_pos, body_rot, body_vel, body_ang_vel, 
+                                                    local_root_obs_config, local_height_obs_config, 
+                                                    upright_config)
 
-    return obs
-
-
-def get_height_maps(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
-                    ) -> torch.Tensor:
-    """
-    Generates a 2D heightmap grid observation rotated w.r.t. the character's heading.
-    Each sample is the billinear interpolation between adjacent points.
-    """
-    asset: Articulation = env.scene[asset_cfg.name]
-
-    env_ids = torch.arange(env.num_envs, device="cuda:0").long()
-    num_envs = len(env_ids)
-
-    root_states = asset.data.root_state_w
-    base_pos = root_states[:, :3]
-    height_points = init_height_points(num_envs)
-    height_samples = torch.zeros(2800, 1400).to("cuda:0")
-
-    return get_height_maps_jit(
-        root_states=root_states,
-        base_pos=base_pos,
-        env_ids=env_ids,
-        num_envs=num_envs,
-        height_points=height_points,
-        height_samples=height_samples,
-        num_height_points=num_height_points,
-        terrain_horizontal_scale=terrain_horizontal_scale,
-        w_last=True,
-        return_all_dims=False,
-    )
+        return obs
 
 
-def compute_task_obs(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
-                    ) -> torch.Tensor:
-    asset: Articulation = env.scene[asset_cfg.name]
-    bodies_positions = asset.data.body_pos_w
-    root_states = asset.data.root_state_w[..., :7]
-    head_position = bodies_positions[:, asset.find_bodies('Head')[0], :]
-    ground_below_head = torch.min(bodies_positions, dim=1).values[..., 2]
+    # def compute_height_obs(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+    #                     ) -> torch.Tensor:
+    #     """
+    #     Generates a 2D heightmap grid observation rotated w.r.t. the character's heading.
+    #     Each sample is the billinear interpolation between adjacent points.
+    #     """
+    #     asset: Articulation = env.scene[asset_cfg.name]
 
-    traj_samples = traj_tmp.repeat(env.num_envs, 1, 1) + root_states[:, :3].unsqueeze(1).repeat(1, 10, 1)
+    #     env_ids = torch.arange(env.num_envs, device="cuda:0").long()
+    #     num_envs = len(env_ids)
 
-    flat_head_position = head_position.view(-1, 3)
-    flat_head_position[..., 2] -= ground_below_head.view(-1)
+    #     root_states = asset.data.root_state_w
+    #     base_pos = root_states[:, :3]
+    #     height_points = init_height_points(num_envs)
+    #     height_samples = torch.zeros(2800, 1400).to("cuda:0")
 
-    obs = compute_path_observations(
-        root_states,
-        flat_head_position,
-        traj_samples,
-        True,
-        height_conditioned,
-    )
+    #     return get_height_maps_jit(
+    #         root_states=root_states,
+    #         base_pos=base_pos,
+    #         env_ids=env_ids,
+    #         num_envs=num_envs,
+    #         height_points=height_points,
+    #         height_samples=height_samples,
+    #         num_height_points=num_height_points,
+    #         terrain_horizontal_scale=terrain_horizontal_scale,
+    #         w_last=True,
+    #         return_all_dims=False,
+    #     )
 
-    path_obs = obs
 
-    return path_obs
+    # def compute_task_obs(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+    #                     ) -> torch.Tensor:
+    #     asset: Articulation = env.scene[asset_cfg.name]
+
+    #     traj_samples = self._fetch_traj_samples(env_ids)

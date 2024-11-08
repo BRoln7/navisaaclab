@@ -23,6 +23,7 @@ import socnav_sim.tasks.amp.smpl_humanoid.mdp as mdp
 # Scene definition
 ##
 
+obs_computer = mdp.ObsComputer()
 
 @configclass
 class SmplHumanoidSceneCfg(InteractiveSceneCfg):
@@ -77,9 +78,7 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         """Observations for the policy."""
-        humanoid_obs = ObsTerm(func=mdp.compute_humanoid_obs)
-        task_obs = ObsTerm(func=mdp.compute_task_obs)
-        terrain_obs = ObsTerm(func=mdp.get_height_maps)
+        humanoid_obs = ObsTerm(func=obs_computer.compute_humanoid_obs)
 
         def __post_init__(self):
             self.enable_corruption = False

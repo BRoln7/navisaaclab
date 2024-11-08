@@ -18,10 +18,23 @@ from . import observations as obs
 if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedRLEnv
 
+reach_goal_threshold = 0.1
 
-def reach_goal(
-    env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
-) -> torch.Tensor:
+def reach_goal(env: ManagerBasedRLEnv, 
+               asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """Reward for maintaining an upright posture."""
-    print(obs.joint_states)
-    return torch.ones(env.num_envs).to("cuda:0")
+    goal_rewards = (obs.joint_states[:, 0, 0] < reach_goal_threshold).float()
+    
+    return goal_rewards
+
+def cadrl_collision(env: ManagerBasedRLEnv, 
+                    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward for maintaining an upright posture."""
+    d_min = torch.min(obs.joint_states[:, 1:, -1])
+    collision_rewards = torch.where(d_min <= obs.turtlebot_radius*2,
+                                    torch.full_like(d_min, -0.25),
+                                    torch.where((d_min>0.4) & (d_min<0.5), 
+                                                -0.1+0.05*d_min,
+                                                torch.zeros_like(d_min)))
+
+    return collision_rewards

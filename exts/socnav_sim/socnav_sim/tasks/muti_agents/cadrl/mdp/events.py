@@ -60,7 +60,7 @@ def reset_root_state_as_circle(
 
     velocities = root_states[:, 7:13] + rand_samples
 
-    offset = torch.tensor([0., 0., -3., 3., 0., 0.]).to("cuda:0")
+    offset = torch.tensor([0., 0., -1.25, 1.25, 0., 0.]).to("cuda:0")
     positions[..., 1] += offset
     # set into the physics simulation
     asset.write_root_pose_to_sim(torch.cat([positions, orientations], dim=-1), env_ids=env_ids) # type: ignore

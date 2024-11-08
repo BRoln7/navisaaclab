@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedEnv
 
 joint_states = torch.zeros(6, 6, 7).to("cuda:0")
+turtlebot_radius = 0.2
+
 
 def compute_cadrl_obs(env: ManagerBasedEnv, goal: torch.tensor, 
                       asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
@@ -31,7 +33,7 @@ def compute_cadrl_obs(env: ManagerBasedEnv, goal: torch.tensor,
     v_pref = asset.data.root_lin_vel_b[:, 0].reshape(env.num_envs, -1)
     alpha = torch.atan2(asset.data.root_lin_vel_w[:, 1], 
                         asset.data.root_lin_vel_w[:, 0]).reshape(env.num_envs, -1)
-    r = torch.ones(env.num_envs, 1).to("cuda:0") * 0.5
+    r = torch.ones(env.num_envs, 1).to("cuda:0") * turtlebot_radius
     s = torch.concat((dg, v_pref, alpha, r, p), dim=1)
 
     # calculate joint states
@@ -57,7 +59,7 @@ def compute_cadrl_obs(env: ManagerBasedEnv, goal: torch.tensor,
     mask = ~torch.eye(env.num_envs, dtype=torch.bool)
     relative_states = relative_states[mask].view(env.num_envs, env.num_envs-1, 4)
 
-    r_prim = torch.ones(env.num_envs, env.num_envs-1, 1).to("cuda:0") * 0.5
+    r_prim = torch.ones(env.num_envs, env.num_envs-1, 1).to("cuda:0") * turtlebot_radius
     da = torch.sqrt(relative_states[:, :, 0]**2 + relative_states[:, :, 1]**2).reshape(env.num_envs, -1, 1)
     joint_state = torch.concat((relative_states, r_prim, da, 2*r_prim), dim=2)
 

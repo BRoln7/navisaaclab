@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.sim.spawners import materials
+from omni.isaac.lab.sim.spawners import materials, shapes, shapes_cfg
 from omni.isaac.lab.assets import ArticulationCfg, AssetBaseCfg
 from omni.isaac.lab.envs import ManagerBasedRLEnvCfg
 from omni.isaac.lab.managers import EventTermCfg as EventTerm
@@ -16,7 +16,7 @@ from omni.isaac.lab.scene import InteractiveSceneCfg
 # from omni.isaac.lab.terrains import TerrainImporterCfg
 from omni.isaac.lab.utils import configclass
 
-from socnav_sim.assets.jackal import JACKAL_CFG
+from socnav_sim.assets.turtlebot3 import TURTLEBOT_CFG
 import socnav_sim.tasks.muti_agents.cadrl.mdp as mdp
 import torch
 
@@ -24,18 +24,17 @@ import torch
 # Scene definition
 ##
 
-position=torch.tensor(
-    [[ 5.0000, -2.5000,  0.0000],
-     [ 5.0000,  2.5000,  0.0000],
-     [ 0.0000, -5.5000,  0.0000],
-     [ 0.0000,  5.5000,  0.0000],
-     [-5.0000, -2.5000,  0.0000],
-     [-5.0000,  2.5000,  0.0000]]).to('cuda:0')
+position=torch.tensor([
+    [ 2.0000, -1.0000,  0.0000],
+    [ 2.0000,  1.0000,  0.0000],
+    [ 0.0000, -2.2500,  0.0000],
+    [ 0.0000,  2.2500,  0.0000],
+    [-2.0000, -1.0000,  0.0000],
+    [-2.0000,  1.0000,  0.0000]]).to('cuda:0')
 goal = torch.flip(position, dims=[0])
 
 @configclass
 class CadrlSceneCfg(InteractiveSceneCfg):
-    """Configuration for the terrain scene with a smpl_humanoid robot."""
 
     # ground
     ground = AssetBaseCfg(
@@ -49,14 +48,15 @@ class CadrlSceneCfg(InteractiveSceneCfg):
     )
 
     # robots
-    robot: ArticulationCfg = JACKAL_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot") # type: ignore
-
+    robot: ArticulationCfg = TURTLEBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot", # type: ignore
+                                                   collision_group = -1) # type: ignore
+    
     # lights
     light = AssetBaseCfg(
         prim_path="/World/light",
         spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
-
+    
 
 ##
 # MDP settings
@@ -74,7 +74,7 @@ class CommandsCfg:
 class ActionsCfg:
     """Action specifications for the MDP."""
 
-    joint_pos = mdp.JointVelocityActionJackelCfg(
+    joint_pos = mdp.JointVelocityActionTurtlebotCfg(
         asset_name="robot", joint_names=[".*"], scale=1.0, offset=0.0,
     )
 
@@ -111,6 +111,7 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
     reach_goal_reward = RewTerm(mdp.reach_goal, weight=1.0)
+    collision_reward = RewTerm(mdp.cadrl_collision, weight=1.0)
 
 
 @configclass
@@ -120,7 +121,7 @@ class TerminationsCfg:
     # (1) Terminate if the episode length is exceeded
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     # (2) Terminate if the robot out of range
-    root_position = DoneTerm(func=mdp.root_out_range, params={"limit_range": 20})
+    root_position = DoneTerm(func=mdp.root_out_range, params={"limit_range": 15})
 
 @configclass
 class CurriculumCfg:
@@ -134,7 +135,7 @@ class CadrlEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the MuJoCo-style Humanoid walking environment."""
 
     # Scene settings
-    scene: CadrlSceneCfg = CadrlSceneCfg(num_envs=8, env_spacing=5.0)
+    scene: CadrlSceneCfg = CadrlSceneCfg(num_envs=8, env_spacing=2.0)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
@@ -150,7 +151,7 @@ class CadrlEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 4
-        self.episode_length_s = 16.0
+        self.episode_length_s = 20.0
         # simulation settings
         self.sim.dt = 1 / 120.0
         self.sim.render_interval = self.decimation
