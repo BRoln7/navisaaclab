@@ -36,7 +36,7 @@ from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb
 # from stable_baselines3.common.vec_env import VecNormalize
 
 import socnav_sim.tasks  # noqa: F401
-from feature_extractor import RunningMeanStd
+from feature_extractor import TaskMLP
 
 def main():
     env_cfg = parse_env_cfg(
@@ -55,9 +55,15 @@ def main():
     env = Sb3VecEnvWrapper(env) # type: ignore
     env.seed(seed=agent_cfg["seed"])
 
+    env.action_space = gym.spaces.Box(
+        low = -1,
+        high = 1,
+        shape= env.action_space.shape,
+    )
+
     policy_kwargs = dict(
-        features_extractor_class=RunningMeanStd,
-        net_arch=dict(pi=[1024, 512], vf=[1024, 512]),
+        features_extractor_class=TaskMLP,
+        net_arch=dict(pi=[2048, 1024], vf=[2048, 1024]),
         activation_fn=torch.nn.ReLU)
 
     pacer_checkpoint = torch.load('models/pacer/path_follower.pth')

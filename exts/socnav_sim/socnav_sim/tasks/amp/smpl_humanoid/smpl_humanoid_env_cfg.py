@@ -79,6 +79,8 @@ class ObservationsCfg:
     class PolicyCfg(ObsGroup):
         """Observations for the policy."""
         humanoid_obs = ObsTerm(func=obs_computer.compute_humanoid_obs)
+        task_obs = ObsTerm(func=obs_computer.compute_task_obs)
+        terrain_obs = ObsTerm(func=obs_computer.compute_height_obs)
 
         def __post_init__(self):
             self.enable_corruption = False
@@ -144,7 +146,7 @@ class SmplHumanoidEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 4
-        self.episode_length_s = 16.0
+        self.episode_length_s = 20
         # simulation settings
         self.sim.dt = 1 / 120.0
         self.sim.render_interval = self.decimation

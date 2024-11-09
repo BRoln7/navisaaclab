@@ -1,15 +1,5 @@
-from easydict import EasyDict
 import torch
-from torch import Tensor
-import numpy as np
 from socnav_sim.tasks.amp.smpl_humanoid.mdp.isaac_utils import torch_utils, gym_utils
-
-# config params
-height_conditioned = False
-num_height_points = 256
-terrain_horizontal_scale = 0.1
-sample_width = 1
-num_samples_per_axis = 16
 
 dof_offset_indices_isaac_gym_to_sim = torch.tensor(
     [0,  1,  2, 12, 13, 14, 24, 25, 26,  3,  4,  5, 15, 16, 17, 27, 28, 29,
@@ -45,15 +35,20 @@ dof_vel_init = torch.tensor(
 
 
 @torch.jit.script
-def obs_wxyz_to_xyzw(rot_obs):
+def rot_wxyz_to_xyzw(rot_obs):
     wxyz_to_xyzw = [3, 0, 1, 2]
+    rot_obs[:, :, wxyz_to_xyzw] = rot_obs.clone()
+    return rot_obs
+
+@torch.jit.script
+def root_states_wxyz_to_xyzw(rot_obs):
+    wxyz_to_xyzw = [0, 1, 2, 6, 3, 4, 5, 7, 8, 9, 10, 11, 12]
     rot_obs[:, :, wxyz_to_xyzw] = rot_obs.clone()
     return rot_obs
 
 
 @torch.jit.script
 def remove_base_rot(quat):
-    # ZL: removing the base rotation for SMPL model
     base_rot = gym_utils.quat_conjugate(torch.tensor([[0.5, 0.5, 0.5, 0.5]]).to(quat))
     shape = quat.shape[0]
     return gym_utils.quat_mul(quat, base_rot.repeat(shape, 1))
@@ -116,4 +111,33 @@ def compute_humanoid_observations_smpl_max(body_pos, body_rot, body_vel, body_an
     ]
 
     obs = torch.cat(obs_list, dim=-1)
+    return obs
+
+@torch.jit.script
+def compute_location_observations(root_states, traj_samples, upright):
+    root_pos = root_states[:, 0:3]
+    root_rot = root_states[:, 3:7]
+    if not upright:
+        root_rot = remove_base_rot(root_rot)
+    heading_rot = torch_utils.calc_heading_quat_inv(root_rot)
+
+    heading_rot_exp = torch.broadcast_to(
+        heading_rot.unsqueeze(-2),
+        (heading_rot.shape[0], traj_samples.shape[1], heading_rot.shape[1]))
+    heading_rot_exp = torch.reshape(
+        heading_rot_exp, (heading_rot_exp.shape[0] * heading_rot_exp.shape[1],
+                          heading_rot_exp.shape[2]))
+    traj_samples_delta = traj_samples - root_pos.unsqueeze(-2)
+    traj_samples_delta_flat = torch.reshape(
+        traj_samples_delta,
+        (traj_samples_delta.shape[0] * traj_samples_delta.shape[1],
+         traj_samples_delta.shape[2]))
+
+    local_traj_pos = torch_utils.my_quat_rotate(heading_rot_exp,
+                                                traj_samples_delta_flat)
+    local_traj_pos = local_traj_pos[..., 0:2]
+
+    obs = torch.reshape(local_traj_pos,
+                        (traj_samples.shape[0],
+                         traj_samples.shape[1] * local_traj_pos.shape[1]))
     return obs
