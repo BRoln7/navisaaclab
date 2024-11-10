@@ -2,7 +2,7 @@ from omni.isaac.lab.envs.mdp.actions import JointActionCfg, JointAction, joint_a
 from omni.isaac.lab.utils import configclass
 from omni.isaac.lab.managers.action_manager import ActionTerm, ActionTermCfg
 from omni.isaac.lab.envs import ManagerBasedEnv
-from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.obs_utils import dof_offset_indices_isaac_gym_to_sim
+# from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.obs_utils import dof_offset_indices_isaac_gym_to_sim
 
 
 class JointPositionPacerAction(JointAction):
@@ -23,11 +23,11 @@ class JointPositionPacerAction(JointAction):
         self._raw_actions[:] = actions
         # apply the affine transformations
         self._processed_actions = self._raw_actions * self._scale + self._offset
-        self._processed_actions = self._processed_actions.clone()[:, dof_offset_indices_isaac_gym_to_sim]
+        # self._processed_actions = self._processed_actions.clone()[:, dof_offset_indices_isaac_gym_to_sim]
 
     def apply_actions(self):
         # set position targets
-        self._asset.set_joint_position_target(self.processed_actions, joint_ids=self._joint_ids)
+         self._asset.set_joint_position_target(self.processed_actions, joint_ids=self._joint_ids)
 
 
 @configclass

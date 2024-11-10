@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import torch
+import os
 from typing import TYPE_CHECKING
 
 from omni.isaac.lab.assets import Articulation
@@ -15,15 +16,38 @@ from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.obs_utils import (
     rot_wxyz_to_xyzw,
     root_states_wxyz_to_xyzw,
     compute_location_observations,
+    key_body_names,
+    build_amp_observations_smpl
 )
 import socnav_sim.tasks.amp.smpl_humanoid.mdp.isaac_utils.traj_generator as traj_generator
-from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils import running_mean_std
+from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.running_mean_std import RunningMeanStd
+from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.discriminator import Discriminator
 
 # config params
 body_gym_to_sim = [
     10, 9, 11, 0, 12, 14, 19, 1, 5, 
     13, 15, 20, 2, 6, 16, 21, 3, 7, 17, 
     22, 4, 8, 18, 23]
+joint_gym_to_sim = [
+    18, 19, 20, 33, 34, 35, 45, 46, 47, 57, 58, 59,
+    21, 22, 23, 36, 37, 38, 48, 49, 50, 60, 61, 62,
+    6, 7, 8, 0, 1, 2, 3, 4, 5, 9, 10, 11,
+    24, 25, 26, 12, 13, 14, 27, 28, 29,
+    39, 40, 41, 51, 52, 53, 63, 64, 65,
+    15, 16, 17, 30, 31, 32, 42, 43, 44,
+    54, 55, 56, 66, 67, 68
+    ]
+dof_subset = torch.tensor([ 
+    0,  1,  2,  3,  4,  5,  6,  7,  8, 12, 
+    13, 14, 15, 16, 17, 18, 19, 20, 24, 25, 
+    26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 
+    36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 
+    46, 47, 48, 49, 50, 54, 55, 56, 57, 58, 
+    59, 60, 61, 62, 63, 64, 65]).to("cuda:0")
+
+amp_obs_shape = 1950
+running_mean_obs_shape = 1401
+reward_shape = 1
 
 if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedEnv
@@ -40,6 +64,8 @@ class ObsComputer():
         self._num_traj_samples = 10
         self._traj_sample_timestep = 0.5
         self._traj_gen_init = False
+        self._traj_gen = None
+        self.tar_pos: torch.Tensor = None # type: ignore
         self._num_envs = None
         self._device = None
         self._dt = None
@@ -48,6 +74,23 @@ class ObsComputer():
         self.height_meas_scale = 5
         self.num_height_points = 1024
         self.num_center_height_points = 9
+        self._local_root_obs = True
+        self._amp_root_height_obs = False
+        self._has_dof_subset = True
+        self._has_shape_obs_disc = False
+        self.dof_subset = dof_subset
+        self.amp_hist_buff = []
+
+        checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'Humanoid.pth')
+        running_mean_std_params = torch.load(checkpoint_path)
+        self.running_mean_std = RunningMeanStd(running_mean_obs_shape).to("cuda:0")
+        self.running_mean_std.load_state_dict(running_mean_std_params['running_mean_std'])
+        self.running_mean_std.eval()
+        self.reward_mean_std = RunningMeanStd(reward_shape).to("cuda:0")
+        self.reward_mean_std.load_state_dict(running_mean_std_params['reward_mean_std'])
+        self.reward_mean_std.eval()
+        self.discriminator = Discriminator().to("cuda:0")
+        self.discriminator.eval()
 
 
     def compute_humanoid_obs(self, 
@@ -64,7 +107,7 @@ class ObsComputer():
         body_rot = rot_wxyz_to_xyzw(asset.data.body_quat_w)
         body_vel = asset.data.body_lin_vel_w
         body_ang_vel = asset.data.body_ang_vel_w
-        # gym to sim
+        # body gym to sim
         body_pos = body_pos.clone()[:, body_gym_to_sim]
         body_rot = body_rot.clone()[:, body_gym_to_sim]
         body_vel = body_vel.clone()[:, body_gym_to_sim]
@@ -104,12 +147,12 @@ class ObsComputer():
 
         return
 
-
     def _fetch_traj_samples(self):
         # 5 seconds with 0.5 second intervals, 10 samples.
         env_ids = torch.arange(self._num_envs, device=self._device, dtype=torch.long) # type: ignore
 
         timestep_beg = self.progress_buf[env_ids] * self._dt # type: ignore
+        self.tar_pos = self._traj_gen.calc_pos(env_ids, timestep_beg) # type: ignore
         self.progress_buf += 1 # type: ignore
         timesteps = torch.arange(self._num_traj_samples, device=self._device, dtype=torch.float)
         timesteps = timesteps * self._traj_sample_timestep
@@ -117,11 +160,10 @@ class ObsComputer():
 
         env_ids_tiled = torch.broadcast_to(env_ids.unsqueeze(-1), traj_timesteps.shape)
 
-        traj_samples_flat = self._traj_gen.calc_pos(env_ids_tiled.flatten(), traj_timesteps.flatten())
+        traj_samples_flat = self._traj_gen.calc_pos(env_ids_tiled.flatten(), traj_timesteps.flatten()) # type: ignore
         traj_samples = torch.reshape(traj_samples_flat, shape=(env_ids.shape[0], self._num_traj_samples, traj_samples_flat.shape[-1]))
 
         return traj_samples
-
 
     def compute_task_obs(self, 
                          env: ManagerBasedEnv, 
@@ -133,11 +175,11 @@ class ObsComputer():
             root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)
             obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)
         else:
+            self.tar_pos = torch.zeros(env.num_envs, 3).to("cuda:0")
             return torch.zeros(env.num_envs, 20).to(env.device)
 
         return obs
     
-
     def compute_height_obs(self,
                            env: ManagerBasedEnv, 
                            asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
@@ -160,3 +202,43 @@ class ObsComputer():
             return torch.zeros(env.num_envs, 1024).to(env.device)
 
         return heights
+    
+    def compute_amp_reward(self,
+                        env: ManagerBasedEnv, 
+                        asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+                        ) -> torch.Tensor:
+        asset: Articulation = env.scene[asset_cfg.name]
+
+        key_body_ids = asset.find_bodies(key_body_names)
+        key_body_ids = [8, 7, 21, 20]
+        key_body_pos = asset.data.body_pos_w[:, key_body_ids]
+        
+        spine_id = asset.find_bodies("Spine")
+        spine_body_pos = asset.data.body_pos_w[:, spine_id[0], :].squeeze(1)
+        spine_body_rot = rot_wxyz_to_xyzw(asset.data.body_quat_w[:, spine_id[0], :]).squeeze(1)
+        spine_body_vel = asset.data.body_lin_vel_w[:, spine_id[0], :].squeeze(1)
+        spine_body_ang_vel = asset.data.body_ang_vel_w[:, spine_id[0], :].squeeze(1)
+
+        joint_pos = asset.data.joint_pos
+        joint_vel = asset.data.joint_vel
+        # joint sim to gym
+        joint_pos[:, joint_gym_to_sim] = joint_pos.clone()
+        joint_vel[:, joint_gym_to_sim] = joint_vel.clone()
+
+        curr_amp_obs = build_amp_observations_smpl(
+            spine_body_pos, spine_body_rot,
+            spine_body_vel, spine_body_ang_vel,
+            joint_pos, joint_vel, key_body_pos,
+            self.dof_subset, 
+            self._local_root_obs, self._amp_root_height_obs, self._has_dof_subset, self._has_upright_start)
+
+        self.amp_hist_buff.append(curr_amp_obs)
+        if len(self.amp_hist_buff) == 10:
+            amp_obs = torch.stack(self.amp_hist_buff, dim=1).reshape(env.num_envs, -1)
+            amp_reward = self.discriminator(amp_obs)
+            self.amp_hist_buff = self.amp_hist_buff[1:]
+
+            return amp_reward.squeeze(-1)
+        
+        else:
+            return torch.zeros(env.num_envs).to("cuda:0")

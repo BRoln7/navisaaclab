@@ -1,12 +1,6 @@
 import torch
 from socnav_sim.tasks.amp.smpl_humanoid.mdp.isaac_utils import torch_utils, gym_utils
 
-dof_offset_indices_isaac_gym_to_sim = torch.tensor(
-    [0,  1,  2, 12, 13, 14, 24, 25, 26,  3,  4,  5, 15, 16, 17, 27, 28, 29,
-     6,  7,  8, 18, 19, 20, 30, 31, 32,  9, 10, 11, 21, 22, 23, 33, 34, 35,
-     39, 40, 41, 54, 55, 56, 36, 37, 38, 42, 43, 44, 57, 58, 59, 45, 46, 47,
-     60, 61, 62, 48, 49, 50, 63, 64, 65, 51, 52, 53, 66, 67, 68]).to("cuda:0")
-
 dof_pos_init = torch.tensor(
     [[-0.0140, -0.4742, -0.1278,  0.0699,  0.1536,  0.0104,  0.0312,  0.1021,
       0.0937, -0.0229,  0.2237, -0.1033, -0.0254,  0.2446,  0.1620, -0.0252,
@@ -33,6 +27,7 @@ dof_vel_init = torch.tensor(
       2.7800e-01,  1.3214e-01, -1.9794e-02,  0.0000e+00,  0.0000e+00,
       0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00]]).to("cuda:0")
 
+key_body_names = ["R_Ankle", "L_Ankle", "R_Wrist", "L_Wrist"]
 
 @torch.jit.script
 def rot_wxyz_to_xyzw(rot_obs):
@@ -140,4 +135,70 @@ def compute_location_observations(root_states, traj_samples, upright):
     obs = torch.reshape(local_traj_pos,
                         (traj_samples.shape[0],
                          traj_samples.shape[1] * local_traj_pos.shape[1]))
+    return obs
+
+
+@torch.jit.script
+def dof_to_obs_smpl(pose):
+    joint_obs_size = 6
+    B, jts = pose.shape
+    num_joints = int(jts / 3)
+
+    joint_dof_obs = torch_utils.quat_to_tan_norm(
+        torch_utils.exp_map_to_quat(pose.reshape(-1, 3))).reshape(B, -1)
+    assert ((num_joints * joint_obs_size) == joint_dof_obs.shape[1])
+
+    return joint_dof_obs
+
+
+@torch.jit.script
+def build_amp_observations_smpl(root_pos, root_rot, root_vel, root_ang_vel,
+                                dof_pos, dof_vel, key_body_pos,
+                                dof_subset, 
+                                local_root_obs:bool, root_height_obs:bool, has_dof_subset:bool, upright:bool):
+    B, N = root_pos.shape
+    root_h = root_pos[:, 2:3]
+    if not upright:
+        root_rot = remove_base_rot(root_rot)
+    heading_rot = torch_utils.calc_heading_quat_inv(root_rot)
+
+    if (local_root_obs):
+        root_rot_obs = gym_utils.quat_mul(heading_rot, root_rot)
+    else:
+        root_rot_obs = root_rot
+
+    root_rot_obs = torch_utils.quat_to_tan_norm(root_rot_obs)
+
+    local_root_vel = torch_utils.my_quat_rotate(heading_rot, root_vel)
+    local_root_ang_vel = torch_utils.my_quat_rotate(heading_rot, root_ang_vel)
+
+    root_pos_expand = root_pos.unsqueeze(-2)
+    local_key_body_pos = key_body_pos - root_pos_expand
+
+    heading_rot_expand = heading_rot.unsqueeze(-2)
+    heading_rot_expand = heading_rot_expand.repeat(
+        (1, local_key_body_pos.shape[1], 1))
+    flat_end_pos = local_key_body_pos.view(
+        local_key_body_pos.shape[0] * local_key_body_pos.shape[1],
+        local_key_body_pos.shape[2])
+    flat_heading_rot = heading_rot_expand.view(
+        heading_rot_expand.shape[0] * heading_rot_expand.shape[1],
+        heading_rot_expand.shape[2])
+    local_end_pos = torch_utils.my_quat_rotate(flat_heading_rot, flat_end_pos)
+    flat_local_key_pos = local_end_pos.view(
+        local_key_body_pos.shape[0],
+        local_key_body_pos.shape[1] * local_key_body_pos.shape[2])
+
+    if has_dof_subset:
+        dof_vel = dof_vel[:, dof_subset]
+        dof_pos = dof_pos[:, dof_subset]
+
+    dof_obs = dof_to_obs_smpl(dof_pos)
+    obs_list = []
+    if root_height_obs: obs_list.append(root_h)
+    obs_list += [
+        root_rot_obs, local_root_vel, local_root_ang_vel, dof_obs, dof_vel,
+        flat_local_key_pos
+    ]
+    obs = torch.cat(obs_list, dim=-1)
     return obs

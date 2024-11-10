@@ -67,7 +67,7 @@ class ActionsCfg:
     """Action specifications for the MDP."""
 
     joint_pos = mdp.JointPositionActionPacerCfg(
-        asset_name="robot", joint_names=[".*"], scale=3.1416, offset=1.0,
+        asset_name="robot", joint_names=[".*"], scale=3.1416, offset=0.0,
     )
 
 
@@ -104,9 +104,14 @@ class EventCfg:
 @configclass
 class RewardsCfg:
     """Reward terms for the MDP."""
+    location_reward = RewTerm(mdp.compute_location_reward, 
+                              weight= 1.0,
+                              params={"tar_pos": obs_computer.tar_pos})
+    power_reward = RewTerm(mdp.compute_power_reward,
+                           weight=1.0)
+    amp_reward = RewTerm(obs_computer.compute_amp_reward,
+                         weight=1.0)
     
-    pass
-
 
 @configclass
 class TerminationsCfg:
