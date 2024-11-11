@@ -22,6 +22,9 @@ from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.obs_utils import (
 import socnav_sim.tasks.amp.smpl_humanoid.mdp.isaac_utils.traj_generator as traj_generator
 from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.running_mean_std import RunningMeanStd
 from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.discriminator import Discriminator
+from omni.isaac.lab.markers import VisualizationMarkersCfg, VisualizationMarkers
+import omni.isaac.lab.sim as sim_utils
+import socnav_sim.tasks.amp.smpl_humanoid.mdp.reset as Reset
 
 # config params
 body_gym_to_sim = [
@@ -52,6 +55,17 @@ reward_shape = 1
 if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedEnv
 
+trajectory_cfg = VisualizationMarkersCfg(
+    prim_path="/World/Visuals/TrajectoryMarkers",
+    markers={
+        "marker": sim_utils.SphereCfg(
+            radius=0.05,
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.4, 0.7)),
+        ),
+    }
+)
+trajectory_marker = VisualizationMarkers(trajectory_cfg)
+
 #########################################################################################
 ##################################### function for obs ################################## 
 #########################################################################################
@@ -65,11 +79,8 @@ class ObsComputer():
         self._traj_sample_timestep = 0.5
         self._traj_gen_init = False
         self._traj_gen = None
-        self.tar_pos: torch.Tensor = None # type: ignore
-        self._num_envs = None
-        self._device = None
-        self._dt = None
         self.progress_buf = None
+        self.tar_pos: torch.Tensor = None # type: ignore
         self._has_upright_start = True
         self.height_meas_scale = 5
         self.num_height_points = 1024
@@ -91,7 +102,6 @@ class ObsComputer():
         self.reward_mean_std.eval()
         self.discriminator = Discriminator().to("cuda:0")
         self.discriminator.eval()
-
 
     def compute_humanoid_obs(self, 
                              env: ManagerBasedEnv, 
@@ -116,10 +126,6 @@ class ObsComputer():
         obs = compute_humanoid_observations_smpl_max(body_pos, body_rot, body_vel, body_ang_vel, 
                                                     local_root_obs_config, local_height_obs_config, 
                                                     upright_config)
-        
-        if self._traj_gen_init == False:
-            self._traj_gen_init = True
-            self._build_traj_generator(env, asset_cfg)
 
         return obs
     
@@ -127,34 +133,32 @@ class ObsComputer():
                               env: ManagerBasedEnv, 
                               asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
         asset: Articulation = env.scene[asset_cfg.name]
-        self._num_envs = env.num_envs
-        self._device = env.device
-        self._dt = env.physics_dt
         episode_dur = env.max_episode_length * env.physics_dt # type: ignore
         num_verts = 101
         dtheta_max = 2.0
-        self._traj_gen = traj_generator.TrajGenerator(self._num_envs, episode_dur, num_verts,
+        self._traj_gen = traj_generator.TrajGenerator(env.num_envs, episode_dur, num_verts,
                                                       env.device, dtheta_max,
                                                       self._speed_min, self._speed_max,
                                                       self._accel_max, self._sharp_turn_prob)
 
-        env_ids = torch.arange(self._num_envs, device=env.device, dtype=torch.long)
+        env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long)
         root_pos = asset.data.root_pos_w[:, 0:3]
         self._traj_gen.reset(env_ids, root_pos)
-        self.progress_buf = torch.zeros(self._num_envs, device=env.device, dtype=torch.long)
+        self.progress_buf = torch.zeros(env.num_envs, device=env.device, dtype=torch.long)
 
         print(f"INFO: traj_gen init")
 
         return
 
-    def _fetch_traj_samples(self):
+    def _fetch_traj_samples(self,
+                            env: ManagerBasedEnv):
         # 5 seconds with 0.5 second intervals, 10 samples.
-        env_ids = torch.arange(self._num_envs, device=self._device, dtype=torch.long) # type: ignore
+        env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long) # type: ignore
 
-        timestep_beg = self.progress_buf[env_ids] * self._dt # type: ignore
+        timestep_beg = self.progress_buf[env_ids] * env.physics_dt # type: ignore
         self.tar_pos = self._traj_gen.calc_pos(env_ids, timestep_beg) # type: ignore
         self.progress_buf += 1 # type: ignore
-        timesteps = torch.arange(self._num_traj_samples, device=self._device, dtype=torch.float)
+        timesteps = torch.arange(self._num_traj_samples, device=env.device, dtype=torch.float)
         timesteps = timesteps * self._traj_sample_timestep
         traj_timesteps = timestep_beg.unsqueeze(-1) + timesteps
 
@@ -170,31 +174,36 @@ class ObsComputer():
                          asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
                          ) -> torch.Tensor:
         asset: Articulation = env.scene[asset_cfg.name]
-        if self._traj_gen_init:
-            traj_samples = self._fetch_traj_samples()
-            root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)
-            obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)
-        else:
-            self.tar_pos = torch.zeros(env.num_envs, 3).to("cuda:0")
-            return torch.zeros(env.num_envs, 20).to(env.device)
+        if self._traj_gen_init == False:
+            self._traj_gen_init = True
+            self._build_traj_generator(env, asset_cfg)
+
+        traj_samples = self._fetch_traj_samples(env)
+        root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)
+        obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)
+
+        # for traj_reset
+        root_pos = asset.data.root_pos_w[:, 0:3]
+        if Reset.traj_reset_flag is not None and Reset.traj_reset_flag.numel()>0:
+            traj_reset_flag = Reset.traj_reset_flag.unsqueeze(0).reshape(-1)
+            root_pos_reset = root_pos[traj_reset_flag, ...].reshape(-1, 3)
+            self._traj_gen.reset(traj_reset_flag, root_pos_reset) # type: ignore
+            self.progress_buf[traj_reset_flag] = 0 # type: ignore
+        
+        trajectory_marker.visualize(translations=traj_samples.reshape(-1, 3))
+        print("buff", self.progress_buf[0]) # type: ignore
 
         return obs
     
     def compute_height_obs(self,
-                           env: ManagerBasedEnv, 
-                           asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+                           env: ManagerBasedEnv,
                         ) -> torch.Tensor:
-        # asset: Articulation = env.scene[asset_cfg.name]
-        # head_index = asset.find_bodies("Head")
-        # head_pos = asset.data.body_pos_w[:, head_index]
-        # head_rot = rot_wxyz_to_xyzw(asset.data.body_quat_w[:, head_index])
-        # head_pose = torch.cat((head_pos, head_rot), dim=1)
         if self._traj_gen_init:
-            self.measured_heights = torch.zeros(self._num_envs, self.num_height_points,  # type: ignore
-                                                device=self._device, requires_grad=False)
+            self.measured_heights = torch.zeros(env.num_envs, self.num_height_points,  # type: ignore
+                                                device=env.device, requires_grad=False)
             
-            center_heights = torch.zeros(self._num_envs, self.num_center_height_points, # type: ignore
-                                device=self._device, requires_grad=False)
+            center_heights = torch.zeros(env.num_envs, self.num_center_height_points, # type: ignore
+                                device=env.device, requires_grad=False)
             center_heights = center_heights.mean(dim=-1, keepdim=True)
             heights = center_heights - self.measured_heights
             heights = torch.clip(heights, -3, 3.) * self.height_meas_scale

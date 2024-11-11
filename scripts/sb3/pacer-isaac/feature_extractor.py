@@ -5,7 +5,9 @@ import gymnasium as gym
 import numpy as np
 import random
 import os
+from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.running_mean_std import RunningMeanStd
 
+obs_shape = 1401
 SEED = 4801
 seed = 0
 random.seed(seed)
@@ -18,56 +20,27 @@ torch.cuda.manual_seed_all(seed)
 class TaskMLP(BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Box, features_dim:int = 613):
       super(TaskMLP, self).__init__(observation_space, features_dim)
-      self._task_mlp = nn.Sequential(
+      self.task_mlp = nn.Sequential(
           nn.Linear(1044, 512),
           nn.ReLU(),
           nn.Linear(512, 256),
           nn.ReLU())
+      
+      checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'Humanoid.pth')
+      running_mean_std_params = torch.load(checkpoint_path)
+      self.running_mean_std = RunningMeanStd(obs_shape).to("cuda:0")
+      self.running_mean_std.load_state_dict(running_mean_std_params['running_mean_std'])
+      self.running_mean_std.eval()
+      
     
     def forward(self, obs):
+      obs_norm = self.running_mean_std(obs)
       self.self_obs_size = 357
       self.task_obs_size = 1044
-      self_obs = obs[:, :self.self_obs_size]
-      task_obs = obs[:, self.self_obs_size:(self.self_obs_size + self.task_obs_size)]
-      task_out = self._task_mlp(task_obs)
+      self_obs = obs_norm[:, :self.self_obs_size]
+      task_obs = obs_norm[:, self.self_obs_size:(self.self_obs_size + self.task_obs_size)]
+      task_out = self.task_mlp(task_obs)
       task_features = torch.cat([self_obs, task_out], dim = -1)
       assert(task_features.size(1) == self.features_dim)
       return task_features
-        
-
-"""
-Network(
-  (actor_cnn): Sequential()
-  (critic_cnn): Sequential()
-  (actor_mlp): Sequential(
-    (0): Linear(in_features=613, out_features=2048, bias=True)
-    (1): ReLU()
-    (2): Linear(in_features=2048, out_features=1024, bias=True)
-    (3): ReLU()
-  )
-  (critic_mlp): Sequential(
-    (0): Linear(in_features=613, out_features=2048, bias=True)
-    (1): ReLU()
-    (2): Linear(in_features=2048, out_features=1024, bias=True)
-    (3): ReLU()
-  )
-  (value): Linear(in_features=1024, out_features=1, bias=True)
-  (value_act): Identity()
-  (mu): Linear(in_features=1024, out_features=69, bias=True)
-  (mu_act): Identity()
-  (sigma_act): Identity()
-  (_disc_mlp): Sequential(
-    (0): Linear(in_features=1950, out_features=1024, bias=True)
-    (1): ReLU()
-    (2): Linear(in_features=1024, out_features=512, bias=True)
-    (3): ReLU()
-  )
-  (_disc_logits): Linear(in_features=512, out_features=1, bias=True)
-  (_task_mlp): Sequential(
-    (0): Linear(in_features=1044, out_features=512, bias=True)
-    (1): ReLU()
-    (2): Linear(in_features=512, out_features=256, bias=True)
-    (3): ReLU()
-  )
-)
-"""
+    

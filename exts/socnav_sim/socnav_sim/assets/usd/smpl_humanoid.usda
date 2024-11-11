@@ -1,13 +1,75 @@
 #usda 1.0
 (
+    customLayerData = {
+        dictionary cameraSettings = {
+            dictionary Front = {
+                double3 position = (500, 0, 0)
+                double radius = 5
+            }
+            dictionary Perspective = {
+                double3 position = (3.063856271023025, 2.283824491429344, 1.7725134011702761)
+                double3 target = (0.38095369497965725, -0.4713337410492424, 0.09037998868133923)
+            }
+            dictionary Right = {
+                double3 position = (0, -500, 0)
+                double radius = 5
+            }
+            dictionary Top = {
+                double3 position = (0, 0, 500)
+                double radius = 5
+            }
+            string boundCamera = "/OmniverseKit_Persp"
+        }
+        dictionary omni_layer = {
+            string authoring_layer = "./smpl_humanoid.usda"
+        }
+        dictionary renderSettings = {
+            float3 "rtx:debugView:pixelDebug:textColor" = (0, 1e18, 0)
+            float3 "rtx:fog:fogColor" = (0.75, 0.75, 0.75)
+            float3 "rtx:index:backgroundColor" = (0, 0, 0)
+            float3 "rtx:index:regionOfInterestMax" = (0, 0, 0)
+            float3 "rtx:index:regionOfInterestMin" = (0, 0, 0)
+            float3 "rtx:post:backgroundZeroAlpha:backgroundDefaultColor" = (0, 0, 0)
+            float3 "rtx:post:colorcorr:contrast" = (1, 1, 1)
+            float3 "rtx:post:colorcorr:gain" = (1, 1, 1)
+            float3 "rtx:post:colorcorr:gamma" = (1, 1, 1)
+            float3 "rtx:post:colorcorr:offset" = (0, 0, 0)
+            float3 "rtx:post:colorcorr:saturation" = (1, 1, 1)
+            float3 "rtx:post:colorgrad:blackpoint" = (0, 0, 0)
+            float3 "rtx:post:colorgrad:contrast" = (1, 1, 1)
+            float3 "rtx:post:colorgrad:gain" = (1, 1, 1)
+            float3 "rtx:post:colorgrad:gamma" = (1, 1, 1)
+            float3 "rtx:post:colorgrad:lift" = (0, 0, 0)
+            float3 "rtx:post:colorgrad:multiply" = (1, 1, 1)
+            float3 "rtx:post:colorgrad:offset" = (0, 0, 0)
+            float3 "rtx:post:colorgrad:whitepoint" = (1, 1, 1)
+            float3 "rtx:post:lensDistortion:lensFocalLengthArray" = (10, 30, 50)
+            float3 "rtx:post:lensFlares:anisoFlareFalloffX" = (450, 475, 500)
+            float3 "rtx:post:lensFlares:anisoFlareFalloffY" = (10, 10, 10)
+            float3 "rtx:post:lensFlares:cutoffPoint" = (2, 2, 2)
+            float3 "rtx:post:lensFlares:haloFlareFalloff" = (10, 10, 10)
+            float3 "rtx:post:lensFlares:haloFlareRadius" = (75, 75, 75)
+            float3 "rtx:post:lensFlares:isotropicFlareFalloff" = (50, 50, 50)
+            float3 "rtx:post:tonemap:whitepoint" = (1, 1, 1)
+            float3 "rtx:raytracing:indexdirect:svoBrickSize" = (32, 32, 32)
+            float3 "rtx:raytracing:inscattering:singleScatteringAlbedo" = (0.9, 0.9, 0.9)
+            float3 "rtx:raytracing:inscattering:transmittanceColor" = (0.5, 0.5, 0.5)
+            float3 "rtx:sceneDb:ambientLightColor" = (0.1, 0.1, 0.1)
+        }
+    }
     defaultPrim = "smpl_humanoid"
     upAxis = "Z"
 )
 
 def Xform "smpl_humanoid" (
     delete apiSchemas = ["PhysicsArticulationRootAPI", "PhysxArticulationAPI"]
+    prepend apiSchemas = ["MaterialBindingAPI"]
 )
 {
+    rel material:binding = </smpl_humanoid/Looks/OmniPBR> (
+        bindMaterialAs = "weakerThanDescendants"
+    )
+
     def Xform "bodies"
     {
         quatd xformOp:orient = (1, 0, 0, 0)
@@ -84,7 +146,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.17457362, -0.0615, -0.0615), (0.17457362, 0.0615, 0.0615)]
                     double height = 0.22614723443984985
-                    
                     double radius = 0.061500001698732376
                     matrix4d xformOp:transform = ( (-0.011939160190055809, 0.09064890978710949, -0.995811366106409, 0), (-0.09064890978710949, 0.9916834833012701, 0.09135997194515255, 0), (0.995811366106409, 0.09135997194515255, -0.0036226434913260164, 0), (-0.0022499999031424522, 0.017149999737739563, -0.18759998679161072, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -131,7 +192,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.1742919, -0.0541, -0.0541), (0.1742919, 0.0541, 0.0541)]
                     double height = 0.2403837889432907
-                    
                     double radius = 0.054099999368190765
                     matrix4d xformOp:transform = ( (-0.10940859099234901, -0.03411211673751424, -0.9934114568606276, 0), (0.03411211673751424, 0.9986934117460851, -0.038050401586811944, 0), (0.9934114568606276, -0.038050401586811944, -0.10810200273843407, 0), (-0.02185000106692314, -0.006800000090152025, -0.19900000095367432, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -169,7 +229,6 @@ def Xform "smpl_humanoid" (
                 )
                 {
                     float3[] extent = [(-0.085, -0.0483, -0.0464), (0.085, 0.0483, 0.0464)]
-                    
                     matrix4d xformOp:transform = ( (0.08500000089406967, 0, 0, 0), (0, 0.04830000177025795, 0, 0), (0, 0, 0.04639999940991402, 0), (0.02419999986886978, 0.02329999953508377, -0.023900000378489494, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
                 }
@@ -209,7 +268,6 @@ def Xform "smpl_humanoid" (
                 )
                 {
                     float3[] extent = [(-0.0496, -0.0478, -0.02), (0.0496, 0.0478, 0.02)]
-                    
                     matrix4d xformOp:transform = ( (0.04960000142455101, 0, 0, 0), (0, 0.04780000075697899, 0, 0), (0, 0, 0.019999999552965164, 0), (0.024800000712275505, -0.003000000026077032, 0.005499999970197678, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
                 }
@@ -250,7 +308,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.17600003, -0.0606, -0.0606), (0.17600003, 0.0606, 0.0606)]
                     double height = 0.230800062417984
-                    
                     double radius = 0.060600001364946365
                     matrix4d xformOp:transform = ( (-0.022963758908119747, -0.09922008453180808, -0.9948005614967315, 0), (0.09922008453180808, 0.9899239929774946, -0.10102407683819337, 0), (0.9948005614967315, -0.10102407683819337, -0.012887751885614307, 0), (-0.004449999891221523, -0.01915000006556511, -0.19130000472068787, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -297,7 +354,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.17435956, -0.0541, -0.0541), (0.17435956, 0.0541, 0.0541)]
                     double height = 0.24051912128925323
-                    
                     double radius = 0.054099999368190765
                     matrix4d xformOp:transform = ( (-0.10518921082862365, 0.03908213269914085, -0.993684033715887, 0), (-0.03908213269914085, 0.9982930325657366, 0.043400555915357186, 0), (0.993684033715887, 0.043400555915357186, -0.1034822433943603, 0), (-0.021150000393390656, 0.007899999618530273, -0.19919998943805695, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -335,7 +391,6 @@ def Xform "smpl_humanoid" (
                 )
                 {
                     float3[] extent = [(-0.0865, -0.0483, -0.0478), (0.0865, 0.0483, 0.0478)]
-                    
                     matrix4d xformOp:transform = ( (0.08649999648332596, 0, 0, 0), (0, 0.04830000177025795, 0, 0), (0, 0, 0.04780000075697899, 0), (0.025599999353289604, -0.021199999377131462, -0.017400000244379044, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
                 }
@@ -375,7 +430,6 @@ def Xform "smpl_humanoid" (
                 )
                 {
                     float3[] extent = [(-0.0493, -0.0479, -0.0216), (0.0493, 0.0479, 0.0216)]
-                    
                     matrix4d xformOp:transform = ( (0.049300000071525574, 0, 0, 0), (0, 0.0478999987244606, 0, 0), (0, 0, 0.02160000056028366, 0), (0.022700000554323196, 0.00419999985024333, 0.0044999998062849045, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
                 }
@@ -417,7 +471,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.083654806, -0.0769, -0.0769), (0.083654806, 0.0769, 0.0769)]
                     double height = 0.01350962370634079
-                    
                     double radius = 0.07689999788999557
                     matrix4d xformOp:transform = ( (0.007402076388828394, 0.03701065877151688, 0.9992874801374754, 0), (-0.03701065877151688, 0.998640275983483, -0.03671253717843381, 0), (-0.9992874801374754, -0.03671253717843381, 0.008761800405345355, 0), (0.0005499999970197678, 0.002749999985098839, 0.06755000352859497, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -459,7 +512,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.07845212, -0.0755, -0.0755), (0.07845212, 0.0755, 0.0755)]
                     double height = 0.00590423634275794
-                    
                     double radius = 0.0754999965429306
                     matrix4d xformOp:transform = ( (0.4403618872690447, 0.016936992206694867, 0.8976605616635425, 0), (-0.016936992206694867, 0.9998008405180587, -0.010555452245490926, 0), (-0.8976605616635425, -0.010555452245490926, 0.44056104675098595, 0), (0.012700000777840614, 0.000750000006519258, 0.02645000070333481, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -507,7 +559,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.10799792, -0.1002, -0.1002), (0.10799792, 0.1002, 0.1002)]
                     double height = 0.015595834702253342
-                    
                     double radius = 0.10019999742507935
                     matrix4d xformOp:transform = ( (-0.25006691621620214, -0.006411973064500476, 0.9682074862017771, 0), (0.006411973064500476, 0.9999451772621161, 0.00827822960254665, 0), (-0.9682074862017771, 0.00827822960254665, -0.2500120934783183, 0), (-0.01924999989569187, -0.0009500000160187483, 0.07575000077486038, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -549,7 +600,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.06849603, -0.0436, -0.0436), (0.06849603, 0.0436, 0.0436)]
                     double height = 0.04979206994175911
-                    
                     double radius = 0.04360000044107437
                     matrix4d xformOp:transform = ( (0.6185723071703046, 0.0622589219158165, 0.7832574138282666, 0), (-0.0622589219158165, 0.9976051900591054, -0.030128254444425462, 0), (-0.7832574138282666, -0.030128254444425462, 0.6209671171111992, 0), (0.025699999183416367, 0.0025500000920146704, 0.032499998807907104, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -587,7 +637,6 @@ def Xform "smpl_humanoid" (
                 )
                 {
                     float3[] extent = [(-0.076, -0.0606, -0.1154), (0.076, 0.0606, 0.1154)]
-                    
                     matrix4d xformOp:transform = ( (0.07599999755620956, 0, 0, 0), (0, 0.060600001364946365, 0, 0), (0, 0, 0.11540000140666962, 0), (-0.011599999852478504, -0.00419999985024333, 0.08760000020265579, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
                 }
@@ -628,7 +677,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.08101427, -0.0521, -0.0521), (0.08101427, 0.0521, 0.0521)]
                     double height = 0.05782854184508324
-                    
                     double radius = 0.05209999904036522
                     matrix4d xformOp:transform = ( (-0.09165033051700222, 0.9441705227366981, 0.31645275210281376, 0), (-0.9441705227366981, 0.01859612768646457, -0.3289320613587776, 0), (-0.31645275210281376, -0.3289320613587776, 0.8897535417965332, 0), (-0.004449999891221523, 0.045500002801418304, 0.015249999240040779, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -671,7 +719,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.13012776, -0.0517, -0.0517), (0.13012776, 0.0517, 0.0517)]
                     double height = 0.156855508685112
-                    
                     double radius = 0.05169999971985817
                     matrix4d xformOp:transform = ( (-0.10519239866137697, 0.993270810996421, -0.04845223674910759, 0), (-0.993270810996421, -0.10256879630480853, 0.05378384601591968, 0), (0.04845223674910759, 0.05378384601591968, 0.9973763976434316, 0), (-0.013749999925494194, 0.1297999918460846, -0.006400000303983688, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -713,7 +760,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.11534953, -0.0405, -0.0405), (0.11534953, 0.0405, 0.0405)]
                     double height = 0.14969906210899353
-                    
                     double radius = 0.04050000011920929
                     matrix4d xformOp:transform = ( (-0.00467614309579556, 0.999338282561169, 0.03607236906798983, 0), (-0.999338282561169, -0.0033688141391010618, -0.036217856161956385, 0), (-0.03607236906798983, -0.036217856161956385, 0.9986926710433056, 0), (-0.0005499999970197678, 0.12459999322891235, 0.0044999998062849045, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -755,7 +801,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.057515606, -0.0318, -0.0318), (0.057515606, 0.0318, 0.0318)]
                     double height = 0.051431212574243546
-                    
                     double radius = 0.03180000185966492
                     matrix4d xformOp:transform = ( (-0.17499099970421073, 0.9799496170573434, -0.09527289432356945, 0), (-0.9799496170573434, -0.16398878743393652, 0.11316559423944739, 0), (0.09527289432356945, 0.11316559423944739, 0.9889977877297258, 0), (-0.007500000298023224, 0.041999999433755875, -0.004050000105053186, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -792,7 +837,6 @@ def Xform "smpl_humanoid" (
                 )
                 {
                     float3[] extent = [(-0.0538, -0.0585, -0.0158), (0.0538, 0.0585, 0.0158)]
-                    
                     matrix4d xformOp:transform = ( (0.05380000174045563, 0, 0, 0), (0, 0.05849999934434891, 0, 0), (0, 0, 0.015799999237060547, 0), (-0.005799999926239252, 0.049300000071525574, 0.0010000000474974513, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
                 }
@@ -833,7 +877,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.08162974, -0.0511, -0.0511), (0.08162974, 0.0511, 0.0511)]
                     double height = 0.061059482395648956
-                    
                     double radius = 0.051100000739097595
                     matrix4d xformOp:transform = ( (-0.09007595401082158, -0.9433424342020515, 0.3193607169806221, 0), (0.9433424342020515, 0.02201172955016517, 0.33108977601934164, 0), (-0.3193607169806221, 0.33108977601934164, 0.8879123164390132, 0), (-0.004550000187009573, -0.04800000041723251, 0.016249999403953552, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -876,7 +919,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.12962309, -0.0531, -0.0531), (0.12962309, 0.0531, 0.0531)]
                     double height = 0.15304617583751678
-                    
                     double radius = 0.05310000106692314
                     matrix4d xformOp:transform = ( (-0.08363487000130476, -0.9951245802788335, -0.052271813976367376, 0), (0.9951245802788335, -0.08065315204846257, -0.05676445106101635, 0), (0.052271813976367376, -0.05676445106101635, 0.9970182820471577, 0), (-0.010700000450015068, -0.12684999406337738, -0.006700000260025263, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -918,7 +960,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.117402315, -0.0408, -0.0408), (0.117402315, 0.0408, 0.0408)]
                     double height = 0.15320463478565216
-                    
                     double radius = 0.040800001472234726
                     matrix4d xformOp:transform = ( (-0.021539900747069796, -0.9993170524110511, 0.030025202856322597, 0), (0.9993170524110511, -0.020618542011114016, 0.03066522150189721, 0), (-0.030025202856322597, 0.03066522150189721, 0.9990786412640442, 0), (-0.002749999985098839, -0.12764999270439148, 0.003900000127032399, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -960,7 +1001,6 @@ def Xform "smpl_humanoid" (
                     uniform token axis = "X"
                     float3[] extent = [(-0.058255263, -0.0326, -0.0326), (0.058255263, 0.0326, 0.0326)]
                     double height = 0.051310524344444275
-                    
                     double radius = 0.032600000500679016
                     matrix4d xformOp:transform = ( (-0.12083296351485062, -0.990050373864868, -0.07210996661934921, 0), (0.990050373864868, -0.11491844893425451, -0.08120468842620632, 0), (0.07210996661934921, -0.08120468842620632, 0.9940854854194039, 0), (-0.005200000014156103, -0.04230000078678131, -0.0030499999411404133, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
@@ -997,13 +1037,13 @@ def Xform "smpl_humanoid" (
                 )
                 {
                     float3[] extent = [(-0.0546, -0.0569, -0.0164), (0.0546, 0.0569, 0.0164)]
-                    
                     matrix4d xformOp:transform = ( (0.05460000038146973, 0, 0, 0), (0, 0.05689999833703041, 0, 0), (0, 0, 0.01640000008046627, 0), (-0.007899999618530273, -0.04619999974966049, -0.0008999999845400453, 1) )
                     uniform token[] xformOpOrder = ["xformOp:transform"]
                 }
             }
         }
     }
+
     def "joints"
     {
         def PhysicsJoint "L_Hip" (
@@ -2110,4 +2150,35 @@ def Xform "smpl_humanoid" (
             float physxLimit:rotZ:stiffness = 300
         }
     }
+
+    def Scope "Looks"
+    {
+        def Material "OmniPBR"
+        {
+            token outputs:mdl:displacement.connect = </smpl_humanoid/Looks/OmniPBR/Shader.outputs:out>
+            token outputs:mdl:surface.connect = </smpl_humanoid/Looks/OmniPBR/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </smpl_humanoid/Looks/OmniPBR/Shader.outputs:out>
+
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
+                color3f inputs:diffuse_color_constant = (0.7850425, 0.37130803, 1) (
+                    customData = {
+                        float3 default = (0.2, 0.2, 0.2)
+                    }
+                    displayGroup = "Albedo"
+                    displayName = "Albedo Color"
+                    doc = "This is the albedo base color"
+                    hidden = false
+                    renderType = "color"
+                )
+                token outputs:out (
+                    renderType = "material"
+                )
+            }
+        }
+    }
 }
+

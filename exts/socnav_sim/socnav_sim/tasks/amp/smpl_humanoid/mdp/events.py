@@ -4,7 +4,8 @@ from omni.isaac.lab.managers import SceneEntityCfg
 from omni.isaac.lab.assets import Articulation, RigidObject
 import omni.isaac.lab.utils.math as math_utils
 from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.obs_utils import dof_pos_init, dof_vel_init
-
+from omni.isaac.lab.markers import VisualizationMarkers, VisualizationMarkersCfg
+import omni.isaac.lab.sim as sim_utils
 
 def reset_root_state_motion(
     env: ManagerBasedEnv,

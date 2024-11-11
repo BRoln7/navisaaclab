@@ -67,7 +67,7 @@ class ActionsCfg:
     """Action specifications for the MDP."""
 
     joint_pos = mdp.JointPositionActionPacerCfg(
-        asset_name="robot", joint_names=[".*"], scale=3.1416, offset=0.0,
+        asset_name="robot", joint_names=[".*"], scale=0.31416, offset=0.0,
     )
 
 
@@ -104,23 +104,23 @@ class EventCfg:
 @configclass
 class RewardsCfg:
     """Reward terms for the MDP."""
-    location_reward = RewTerm(mdp.compute_location_reward, 
+    location_reward = RewTerm(mdp.compute_location_reward,
                               weight= 1.0,
                               params={"tar_pos": obs_computer.tar_pos})
     power_reward = RewTerm(mdp.compute_power_reward,
                            weight=1.0)
     amp_reward = RewTerm(obs_computer.compute_amp_reward,
                          weight=1.0)
-    
+
 
 @configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
 
-    # (1) Terminate if the episode length is exceeded
-    time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    # (1) Terminate if the trajectory ends
+    trajectory_end = DoneTerm(func=mdp.time_out, time_out=True)
     # (2) Terminate if the robot falls
-    torso_height = DoneTerm(func=mdp.root_height_below_minimum, params={"minimum_height": 0.8})
+    # torso_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.6})
 
 
 @configclass
@@ -135,7 +135,7 @@ class SmplHumanoidEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the MuJoCo-style Humanoid walking environment."""
 
     # Scene settings
-    scene: SmplHumanoidSceneCfg = SmplHumanoidSceneCfg(num_envs=8, env_spacing=5.0)
+    scene: SmplHumanoidSceneCfg = SmplHumanoidSceneCfg(num_envs=8, env_spacing=10.0)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()

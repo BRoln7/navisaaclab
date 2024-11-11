@@ -38,7 +38,7 @@ def rot_wxyz_to_xyzw(rot_obs):
 @torch.jit.script
 def root_states_wxyz_to_xyzw(rot_obs):
     wxyz_to_xyzw = [0, 1, 2, 6, 3, 4, 5, 7, 8, 9, 10, 11, 12]
-    rot_obs[:, :, wxyz_to_xyzw] = rot_obs.clone()
+    rot_obs[:, wxyz_to_xyzw] = rot_obs.clone()
     return rot_obs
 
 
@@ -109,7 +109,7 @@ def compute_humanoid_observations_smpl_max(body_pos, body_rot, body_vel, body_an
     return obs
 
 @torch.jit.script
-def compute_location_observations(root_states, traj_samples, upright):
+def compute_location_observations(root_states, traj_samples, upright:bool):
     root_pos = root_states[:, 0:3]
     root_rot = root_states[:, 3:7]
     if not upright:
