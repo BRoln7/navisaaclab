@@ -53,7 +53,7 @@ running_mean_obs_shape = 1401
 reward_shape = 1
 
 if TYPE_CHECKING:
-    from omni.isaac.lab.envs import ManagerBasedEnv
+    from omni.isaac.lab.envs import ManagerBasedEnv, ManagerBasedRLEnv
 
 trajectory_cfg = VisualizationMarkersCfg(
     prim_path="/World/Visuals/TrajectoryMarkers",
@@ -94,9 +94,6 @@ class ObsComputer():
 
         checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'Humanoid.pth')
         running_mean_std_params = torch.load(checkpoint_path)
-        self.running_mean_std = RunningMeanStd(running_mean_obs_shape).to("cuda:0")
-        self.running_mean_std.load_state_dict(running_mean_std_params['running_mean_std'])
-        self.running_mean_std.eval()
         self.reward_mean_std = RunningMeanStd(reward_shape).to("cuda:0")
         self.reward_mean_std.load_state_dict(running_mean_std_params['reward_mean_std'])
         self.reward_mean_std.eval()
@@ -113,15 +110,15 @@ class ObsComputer():
         local_root_obs_config = True
         local_height_obs_config = False
 
-        body_pos = asset.data.body_pos_w
-        body_rot = rot_wxyz_to_xyzw(asset.data.body_quat_w)
-        body_vel = asset.data.body_lin_vel_w
-        body_ang_vel = asset.data.body_ang_vel_w
-        # body gym to sim
-        body_pos = body_pos.clone()[:, body_gym_to_sim]
-        body_rot = body_rot.clone()[:, body_gym_to_sim]
-        body_vel = body_vel.clone()[:, body_gym_to_sim]
-        body_ang_vel = body_ang_vel.clone()[:, body_gym_to_sim]
+        body_pos = torch.zeros((env.num_envs, asset.num_bodies, 3), device=env.device)
+        body_rot = torch.zeros((env.num_envs, asset.num_bodies, 4), device=env.device)
+        body_vel = torch.zeros((env.num_envs, asset.num_bodies, 3), device=env.device)
+        body_ang_vel = torch.zeros((env.num_envs, asset.num_bodies, 3), device=env.device)
+
+        body_pos[:, body_gym_to_sim] = asset.data.body_pos_w
+        body_rot[:, body_gym_to_sim] = rot_wxyz_to_xyzw(asset.data.body_quat_w)
+        body_vel[:, body_gym_to_sim] = asset.data.body_lin_vel_w
+        body_ang_vel[:, body_gym_to_sim] = asset.data.body_ang_vel_w
 
         obs = compute_humanoid_observations_smpl_max(body_pos, body_rot, body_vel, body_ang_vel, 
                                                     local_root_obs_config, local_height_obs_config, 
@@ -183,16 +180,23 @@ class ObsComputer():
         obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)
 
         # for traj_reset
+        # Fall reset
         root_pos = asset.data.root_pos_w[:, 0:3]
         if Reset.traj_reset_flag is not None and Reset.traj_reset_flag.numel()>0:
             traj_reset_flag = Reset.traj_reset_flag.unsqueeze(0).reshape(-1)
             root_pos_reset = root_pos[traj_reset_flag, ...].reshape(-1, 3)
             self._traj_gen.reset(traj_reset_flag, root_pos_reset) # type: ignore
             self.progress_buf[traj_reset_flag] = 0 # type: ignore
-        
-        trajectory_marker.visualize(translations=traj_samples.reshape(-1, 3))
-        print("buff", self.progress_buf[0]) # type: ignore
+        # episode ends reset
+        episode_ends_idx = torch.nonzero(self.progress_buf > env.max_episode_length) # type: ignore
+        if episode_ends_idx.numel()>0:
+            episode_ends_flag = episode_ends_idx.reshape(-1)
+            root_pos_episode_reset = root_pos[episode_ends_flag, ...].reshape(-1, 3)
+            self._traj_gen.reset(episode_ends_flag, root_pos_episode_reset) # type: ignore
+            self.progress_buf[episode_ends_flag] = 0 # type: ignore
 
+        trajectory_marker.visualize(translations=traj_samples.reshape(-1, 3))
+        
         return obs
     
     def compute_height_obs(self,
@@ -228,11 +232,14 @@ class ObsComputer():
         spine_body_vel = asset.data.body_lin_vel_w[:, spine_id[0], :].squeeze(1)
         spine_body_ang_vel = asset.data.body_ang_vel_w[:, spine_id[0], :].squeeze(1)
 
-        joint_pos = asset.data.joint_pos
-        joint_vel = asset.data.joint_vel
-        # joint sim to gym
-        joint_pos[:, joint_gym_to_sim] = joint_pos.clone()
-        joint_vel[:, joint_gym_to_sim] = joint_vel.clone()
+        joint_pos = torch.zeros((env.num_envs, asset.num_joints), device=env.device)
+        joint_vel = torch.zeros((env.num_envs, asset.num_joints), device=env.device)
+        ###################################################################################
+        ###################################################################################
+        joint_pos[:, joint_gym_to_sim] = asset.data.joint_pos
+        joint_vel[:, joint_gym_to_sim] = asset.data.joint_vel
+        ###############################################################
+        ###############################################################
 
         curr_amp_obs = build_amp_observations_smpl(
             spine_body_pos, spine_body_rot,

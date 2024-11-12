@@ -67,7 +67,7 @@ class ActionsCfg:
     """Action specifications for the MDP."""
 
     joint_pos = mdp.JointPositionActionPacerCfg(
-        asset_name="robot", joint_names=[".*"], scale=0.31416, offset=0.0,
+        asset_name="robot", joint_names=[".*"], scale=3.1416, offset=0.0,
     )
 
 
@@ -120,7 +120,7 @@ class TerminationsCfg:
     # (1) Terminate if the trajectory ends
     trajectory_end = DoneTerm(func=mdp.time_out, time_out=True)
     # (2) Terminate if the robot falls
-    # torso_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.6})
+    torso_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.6})
 
 
 @configclass

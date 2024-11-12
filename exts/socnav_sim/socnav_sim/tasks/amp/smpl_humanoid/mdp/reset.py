@@ -7,20 +7,6 @@ from omni.isaac.lab.envs import ManagerBasedRLEnv
 
 traj_reset_flag = None
 
-def trajectory_end(
-    env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
-) -> torch.Tensor:
-    """Terminate when the asset's root height is below the minimum height.
-
-    Note:
-        This is currently only supported for flat terrains, i.e. the minimum height is in the world frame.
-    """
-    asset: RigidObject = env.scene[asset_cfg.name]
-
-
-
-    return env.episode_length_buf >= env.max_episode_length
-
 def root_state_below_minimum(
     env: ManagerBasedRLEnv, minimum_height: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:

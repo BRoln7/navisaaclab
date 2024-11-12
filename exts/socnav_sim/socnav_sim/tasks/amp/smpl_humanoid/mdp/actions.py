@@ -20,10 +20,18 @@ class JointPositionPacerAction(JointAction):
         self._raw_actions[:] = actions
         self._processed_actions = self._raw_actions * self._scale + self._offset
         self._processed_actions[:, joint_gym_to_sim] = self._processed_actions.clone()
+        self.freeze_hand_toe()
 
     def apply_actions(self):
          self._asset.set_joint_position_target(self.processed_actions, joint_ids=self._joint_ids)
 
+    def freeze_hand_toe(self):
+        freeze_joint_name = ['L_Hand_x', 'L_Hand_y', 'L_Hand_z',
+                            'R_Hand_x', 'R_Hand_y', 'R_Hand_z',
+                            'L_Toe_x', 'L_Toe_y', 'L_Toe_z',
+                            'R_Toe_x', 'R_Toe_y', 'R_Toe_z']
+        freeze_joint_idx = self._asset.find_joints(freeze_joint_name)
+        self._processed_actions[:, freeze_joint_idx[0]] = 0
 
 @configclass
 class JointPositionActionPacerCfg(JointActionCfg):

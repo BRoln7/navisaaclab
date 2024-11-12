@@ -31,6 +31,7 @@ from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 import socnav_sim.tasks
 from feature_extractor import TaskMLP
+import os
 
 
 def main():
@@ -72,6 +73,9 @@ def main():
     agent = PPO(policy_arch, env, verbose=2, **agent_cfg, policy_kwargs=policy_kwargs)
     new_logger = configure(log_dir, ["stdout", "tensorboard"])
     agent.set_logger(new_logger)
+    checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'pacer_ac.pth')
+    checkpoint = torch.load(checkpoint_path)
+    agent.policy.load_state_dict(checkpoint)
 
     checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=log_dir, name_prefix="model", verbose=2)
     agent.learn(total_timesteps=n_timesteps, callback=checkpoint_callback)
