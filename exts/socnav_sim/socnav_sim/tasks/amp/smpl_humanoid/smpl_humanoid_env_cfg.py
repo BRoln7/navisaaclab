@@ -105,8 +105,7 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
     location_reward = RewTerm(mdp.compute_location_reward,
-                              weight= 1.0,
-                              params={"tar_pos": obs_computer.tar_pos})
+                              weight= 1.0)
     power_reward = RewTerm(mdp.compute_power_reward,
                            weight=1.0)
     amp_reward = RewTerm(obs_computer.compute_amp_reward,

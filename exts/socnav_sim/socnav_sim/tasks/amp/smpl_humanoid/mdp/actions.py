@@ -2,7 +2,7 @@ from omni.isaac.lab.envs.mdp.actions import JointActionCfg, JointAction, joint_a
 from omni.isaac.lab.utils import configclass
 from omni.isaac.lab.managers.action_manager import ActionTerm, ActionTermCfg
 from omni.isaac.lab.envs import ManagerBasedEnv
-from socnav_sim.tasks.amp.smpl_humanoid.mdp.observations import joint_gym_to_sim
+from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.obs_utils import dof_gym_to_sim
 
 
 class JointPositionPacerAction(JointAction):
@@ -18,8 +18,8 @@ class JointPositionPacerAction(JointAction):
 
     def process_actions(self, actions):
         self._raw_actions[:] = actions
-        self._processed_actions = self._raw_actions * self._scale + self._offset
-        self._processed_actions[:, joint_gym_to_sim] = self._processed_actions.clone()
+        self._pd_actions = self._raw_actions * self._scale + self._offset
+        self._processed_actions = self._pd_actions[:, dof_gym_to_sim]
         self.freeze_hand_toe()
 
     def apply_actions(self):

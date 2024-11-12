@@ -29,11 +29,59 @@ dof_vel_init = torch.tensor(
 
 key_body_names = ["R_Ankle", "L_Ankle", "R_Wrist", "L_Wrist"]
 
+gym_dof_dict = {'L_Hip_x': 0, 'L_Hip_y': 1, 'L_Hip_z': 2, 'L_Knee_x': 3, 'L_Knee_y': 4, 'L_Knee_z': 5,
+                'L_Ankle_x': 6, 'L_Ankle_y': 7, 'L_Ankle_z': 8, 'L_Toe_x': 9, 'L_Toe_y': 10, 'L_Toe_z': 11, 
+                'R_Hip_x': 12, 'R_Hip_y': 13, 'R_Hip_z': 14, 'R_Knee_x': 15, 'R_Knee_y': 16, 'R_Knee_z': 17,
+                'R_Ankle_x': 18, 'R_Ankle_y': 19, 'R_Ankle_z': 20, 'R_Toe_x': 21, 'R_Toe_y': 22, 'R_Toe_z' : 23,
+                'Torso_x' : 24, 'Torso_y' : 25, 'Torso_z' : 26, 'Spine_x' : 27, 'Spine_y' : 28, 'Spine_z' : 29,
+                'Chest_x': 30, 'Chest_y': 31, 'Chest_z': 32, 'Neck_x': 33, 'Neck_y': 34, 'Neck_z': 35, 
+                'Head_x': 36, 'Head_y': 37, 'Head_z': 38, 'L_Thorax_x': 39, 'L_Thorax_y': 40, 'L_Thorax_z': 41, 
+                'L_Shoulder_x': 42, 'L_Shoulder_y': 43, 'L_Shoulder_z': 44, 'L_Elbow_x': 45, 'L_Elbow_y': 46, 'L_Elbow_z': 47, 
+                'L_Wrist_x': 48, 'L_Wrist_y': 49, 'L_Wrist_z': 50, 'L_Hand_x': 51, 'L_Hand_y': 52, 'L_Hand_z': 53,   
+                'R_Thorax_x': 54, 'R_Thorax_y': 55, 'R_Thorax_z': 56, 'R_Shoulder_x': 57, 'R_Shoulder_y': 58, 'R_Shoulder_z': 59,
+                'R_Elbow_x': 60, 'R_Elbow_y': 61, 'R_Elbow_z': 62, 'R_Wrist_x' : 63, 'R_Wrist_y' : 64, 'R_Wrist_z' : 65, 
+                'R_Hand_x': 66, 'R_Hand_y': 67, 'R_Hand_z': 68}
+
+sim_joint_dict = {'L_Hip_x': 0, 'L_Hip_y': 1, 'L_Hip_z': 2, 'R_Hip_x': 3, 'R_Hip_y': 4, 'R_Hip_z': 5, 
+                'Torso_x': 6, 'Torso_y': 7, 'Torso_z': 8, 'L_Knee_x': 9, 'L_Knee_y': 10, 'L_Knee_z': 11, 
+                'R_Knee_x': 12, 'R_Knee_y': 13, 'R_Knee_z': 14, 'Spine_x': 15, 'Spine_y': 16, 'Spine_z': 17, 
+                'L_Ankle_x': 18, 'L_Ankle_y': 19, 'L_Ankle_z': 20, 'R_Ankle_x': 21, 'R_Ankle_y': 22, 'R_Ankle_z': 23, 
+                'Chest_x': 24, 'Chest_y': 25, 'Chest_z': 26, 'L_Toe_x': 27, 'L_Toe_y': 28, 'L_Toe_z': 29, 
+                'R_Toe_x': 30, 'R_Toe_y': 31, 'R_Toe_z': 32, 'Neck_x': 33, 'Neck_y': 34, 'Neck_z': 35, 
+                'L_Thorax_x': 36, 'L_Thorax_y': 37, 'L_Thorax_z': 38, 'R_Thorax_x': 39, 'R_Thorax_y': 40, 'R_Thorax_z': 41, 
+                'Head_x': 42, 'Head_y': 43, 'Head_z': 44, 'L_Shoulder_x': 45, 'L_Shoulder_y': 46, 'L_Shoulder_z': 47, 
+                'R_Shoulder_x': 48, 'R_Shoulder_y': 49, 'R_Shoulder_z': 50, 'L_Elbow_x': 51, 'L_Elbow_y': 52, 'L_Elbow_z': 53, 
+                'R_Elbow_x': 54, 'R_Elbow_y': 55, 'R_Elbow_z': 56, 'L_Wrist_x': 57, 'L_Wrist_y': 58, 'L_Wrist_z' : 59,
+                'R_Wrist_x': 60, 'R_Wrist_y':61, 'R_Wrist_z':62, 'L_Hand_x':63, 'L_Hand_y':64, 'L_Hand_z':65,
+                'R_Hand_x':66, 'R_Hand_y':67, 'R_Hand_z':68}
+
+gym_rigid_body_dict = {'Pelvis': 0, 'L_Hip': 1, 'L_Knee': 2, 'L_Ankle': 3, 'L_Toe': 4, 'R_Hip': 5, 'R_Knee': 6,
+                       'R_Ankle': 7, 'R_Toe': 8, 'Torso': 9,'Spine': 10,'Chest': 11,'Neck': 12, 'Head': 13, 
+                       'L_Thorax': 14,'L_Shoulder': 15, 'L_Elbow': 16,'L_Wrist': 17,'L_Hand': 18,'R_Thorax': 19,
+                       'R_Shoulder': 20,  'R_Elbow': 21,'R_Wrist': 22, 'R_Hand': 23}
+
+sim_rigid_body_dict = {'Pelvis': 0, 'L_Hip': 1, 'R_Hip': 2, 'Torso': 3, 'L_Knee': 4, 'R_Knee': 5, 'Spine': 6, 
+                       'L_Ankle': 7, 'R_Ankle': 8, 'Chest': 9, 'L_Toe': 10, 'R_Toe': 11, 'Neck': 12, 'L_Thorax': 13, 
+                       'R_Thorax': 14, 'Head': 15, 'L_Shoulder': 16, 'R_Shoulder': 17, 'L_Elbow': 18, 'R_Elbow': 19, 
+                       'L_Wrist': 20, 'R_Wrist': 21, 'L_Hand': 22, 'R_Hand': 23}
+
+dof_sim_to_gym = [0, 1, 2, 12, 13, 14, 24, 25, 26, 3, 4, 5, 15, 16, 17, 27, 28, 29, 
+                  6, 7, 8, 18, 19, 20, 30, 31, 32, 9, 10, 11, 21, 22, 23, 33, 34, 35, 
+                  39, 40, 41, 54, 55, 56, 36, 37, 38, 42, 43, 44, 57, 58, 59, 45, 46, 
+                  47, 60, 61, 62, 48, 49, 50, 63, 64, 65, 51, 52, 53, 66, 67, 68]
+body_sim_to_gym = [0, 1, 5, 9, 2, 6, 10, 3, 7, 11, 4, 8, 12, 14, 19, 13, 15, 20, 16, 21, 17, 22, 18, 23]
+dof_gym_to_sim = [0, 1, 2, 9, 10, 11, 18, 19, 20, 27, 28, 29, 3, 4, 5, 12, 13, 14, 
+                  21, 22, 23, 30, 31, 32, 6, 7, 8, 15, 16, 17, 24, 25, 26, 33, 34, 
+                  35, 42, 43, 44, 36, 37, 38, 45, 46, 47, 51, 52, 53, 57, 58, 59, 
+                  63, 64, 65, 39, 40, 41, 48, 49, 50, 54, 55, 56, 60, 61, 62, 66, 67, 68]
+body_gym_to_sim = [0, 1, 4, 7, 10, 2, 5, 8, 11, 3, 6, 9, 12, 15, 13, 16, 18, 20, 22, 14, 17, 19, 21, 23]
+
 @torch.jit.script
 def rot_wxyz_to_xyzw(rot_obs):
     wxyz_to_xyzw = [3, 0, 1, 2]
     rot_obs[:, :, wxyz_to_xyzw] = rot_obs.clone()
     return rot_obs
+
 
 @torch.jit.script
 def root_states_wxyz_to_xyzw(rot_obs):

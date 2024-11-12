@@ -5,19 +5,18 @@ from omni.isaac.lab.managers import SceneEntityCfg
 from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.rewards_utils import (
     compute_location_rew,
 )
-
+import socnav_sim.tasks.amp.smpl_humanoid.mdp.observations as obs
 power_coefficient = 0.0005
 
 def compute_location_reward(env: ManagerBasedEnv, 
-                            tar_pos: torch.tensor,
                             asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
                     ) -> torch.Tensor:
     asset: Articulation = env.scene[asset_cfg.name]
 
     root_pos = asset.data.root_pos_w[:, :3]
-    if tar_pos is None:
-        return torch.zeros(env.num_envs).to("cuda:0")    
-    location_reward = compute_location_rew(root_pos, tar_pos)
+    if obs.tar_pos is None:
+        return torch.zeros(env.num_envs).to("cuda:0")
+    location_reward = compute_location_rew(root_pos, obs.tar_pos)
 
     return location_reward
     

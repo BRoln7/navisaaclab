@@ -17,7 +17,9 @@ from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.obs_utils import (
     root_states_wxyz_to_xyzw,
     compute_location_observations,
     key_body_names,
-    build_amp_observations_smpl
+    build_amp_observations_smpl,
+    dof_sim_to_gym,
+    body_sim_to_gym,
 )
 import socnav_sim.tasks.amp.smpl_humanoid.mdp.isaac_utils.traj_generator as traj_generator
 from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.running_mean_std import RunningMeanStd
@@ -27,19 +29,6 @@ import omni.isaac.lab.sim as sim_utils
 import socnav_sim.tasks.amp.smpl_humanoid.mdp.reset as Reset
 
 # config params
-body_gym_to_sim = [
-    10, 9, 11, 0, 12, 14, 19, 1, 5, 
-    13, 15, 20, 2, 6, 16, 21, 3, 7, 17, 
-    22, 4, 8, 18, 23]
-joint_gym_to_sim = [
-    18, 19, 20, 33, 34, 35, 45, 46, 47, 57, 58, 59,
-    21, 22, 23, 36, 37, 38, 48, 49, 50, 60, 61, 62,
-    6, 7, 8, 0, 1, 2, 3, 4, 5, 9, 10, 11,
-    24, 25, 26, 12, 13, 14, 27, 28, 29,
-    39, 40, 41, 51, 52, 53, 63, 64, 65,
-    15, 16, 17, 30, 31, 32, 42, 43, 44,
-    54, 55, 56, 66, 67, 68
-    ]
 dof_subset = torch.tensor([ 
     0,  1,  2,  3,  4,  5,  6,  7,  8, 12, 
     13, 14, 15, 16, 17, 18, 19, 20, 24, 25, 
@@ -66,6 +55,8 @@ trajectory_cfg = VisualizationMarkersCfg(
 )
 trajectory_marker = VisualizationMarkers(trajectory_cfg)
 
+tar_pos: torch.Tensor = None # type: ignore
+
 #########################################################################################
 ##################################### function for obs ################################## 
 #########################################################################################
@@ -80,7 +71,6 @@ class ObsComputer():
         self._traj_gen_init = False
         self._traj_gen = None
         self.progress_buf = None
-        self.tar_pos: torch.Tensor = None # type: ignore
         self._has_upright_start = True
         self.height_meas_scale = 5
         self.num_height_points = 1024
@@ -115,10 +105,10 @@ class ObsComputer():
         body_vel = torch.zeros((env.num_envs, asset.num_bodies, 3), device=env.device)
         body_ang_vel = torch.zeros((env.num_envs, asset.num_bodies, 3), device=env.device)
 
-        body_pos[:, body_gym_to_sim] = asset.data.body_pos_w
-        body_rot[:, body_gym_to_sim] = rot_wxyz_to_xyzw(asset.data.body_quat_w)
-        body_vel[:, body_gym_to_sim] = asset.data.body_lin_vel_w
-        body_ang_vel[:, body_gym_to_sim] = asset.data.body_ang_vel_w
+        body_pos = asset.data.body_pos_w[:, body_sim_to_gym]
+        body_rot = rot_wxyz_to_xyzw(asset.data.body_quat_w)[:, body_sim_to_gym]
+        body_vel = asset.data.body_lin_vel_w[:, body_sim_to_gym]
+        body_ang_vel = asset.data.body_ang_vel_w[:, body_sim_to_gym]
 
         obs = compute_humanoid_observations_smpl_max(body_pos, body_rot, body_vel, body_ang_vel, 
                                                     local_root_obs_config, local_height_obs_config, 
@@ -153,7 +143,11 @@ class ObsComputer():
         env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long) # type: ignore
 
         timestep_beg = self.progress_buf[env_ids] * env.physics_dt # type: ignore
-        self.tar_pos = self._traj_gen.calc_pos(env_ids, timestep_beg) # type: ignore
+        
+        # for local reward 
+        global tar_pos
+        tar_pos = self._traj_gen.calc_pos(env_ids, timestep_beg) # type: ignore
+        
         self.progress_buf += 1 # type: ignore
         timesteps = torch.arange(self._num_traj_samples, device=env.device, dtype=torch.float)
         timesteps = timesteps * self._traj_sample_timestep
@@ -234,12 +228,8 @@ class ObsComputer():
 
         joint_pos = torch.zeros((env.num_envs, asset.num_joints), device=env.device)
         joint_vel = torch.zeros((env.num_envs, asset.num_joints), device=env.device)
-        ###################################################################################
-        ###################################################################################
-        joint_pos[:, joint_gym_to_sim] = asset.data.joint_pos
-        joint_vel[:, joint_gym_to_sim] = asset.data.joint_vel
-        ###############################################################
-        ###############################################################
+        joint_pos = asset.data.joint_pos[:, dof_sim_to_gym]
+        joint_vel = asset.data.joint_vel[:, dof_sim_to_gym]
 
         curr_amp_obs = build_amp_observations_smpl(
             spine_body_pos, spine_body_rot,
