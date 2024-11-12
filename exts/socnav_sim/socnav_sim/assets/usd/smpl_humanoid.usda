@@ -7,8 +7,8 @@
                 double radius = 5
             }
             dictionary Perspective = {
-                double3 position = (3.063856271023025, 2.283824491429344, 1.7725134011702761)
-                double3 target = (0.38095369497965725, -0.4713337410492424, 0.09037998868133923)
+                double3 position = (2.643857731632948, -3.7069299628424717, 1.5146753215917403)
+                double3 target = (0.3809537748391789, -0.47133344303162783, 0.0903801347497013)
             }
             dictionary Right = {
                 double3 position = (0, -500, 0)
@@ -2164,7 +2164,7 @@ def Xform "smpl_humanoid" (
                 uniform token info:implementationSource = "sourceAsset"
                 uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
                 uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
-                color3f inputs:diffuse_color_constant = (0.7850425, 0.37130803, 1) (
+                color3f inputs:diffuse_color_constant = (1, 0.20253164, 0) (
                     customData = {
                         float3 default = (0.2, 0.2, 0.2)
                     }

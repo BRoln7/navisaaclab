@@ -34,7 +34,7 @@ class SmplHumanoidSceneCfg(InteractiveSceneCfg):
         prim_path="/World/ground",
         spawn=sim_utils.GroundPlaneCfg(
             size=(500, 500), 
-            color=(0.5, 0.7, 1.),
+            color=(0.4, 0.6, 0.95),
             physics_material=materials.RigidBodyMaterialCfg(static_friction=1.0,
                                                             dynamic_friction=1.0,
                                                             restitution=1.0))

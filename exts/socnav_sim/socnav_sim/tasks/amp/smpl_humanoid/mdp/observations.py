@@ -48,8 +48,8 @@ trajectory_cfg = VisualizationMarkersCfg(
     prim_path="/World/Visuals/TrajectoryMarkers",
     markers={
         "marker": sim_utils.SphereCfg(
-            radius=0.05,
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.4, 0.7)),
+            radius=0.1,
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 0.2)),
         ),
     }
 )
@@ -104,7 +104,6 @@ class ObsComputer():
         body_rot = torch.zeros((env.num_envs, asset.num_bodies, 4), device=env.device)
         body_vel = torch.zeros((env.num_envs, asset.num_bodies, 3), device=env.device)
         body_ang_vel = torch.zeros((env.num_envs, asset.num_bodies, 3), device=env.device)
-
         body_pos = asset.data.body_pos_w[:, body_sim_to_gym]
         body_rot = rot_wxyz_to_xyzw(asset.data.body_quat_w)[:, body_sim_to_gym]
         body_vel = asset.data.body_lin_vel_w[:, body_sim_to_gym]
@@ -231,6 +230,9 @@ class ObsComputer():
         joint_pos = asset.data.joint_pos[:, dof_sim_to_gym]
         joint_vel = asset.data.joint_vel[:, dof_sim_to_gym]
 
+        ############################################################
+        ################## todo: check subset ######################
+        ############################################################
         curr_amp_obs = build_amp_observations_smpl(
             spine_body_pos, spine_body_rot,
             spine_body_vel, spine_body_ang_vel,
