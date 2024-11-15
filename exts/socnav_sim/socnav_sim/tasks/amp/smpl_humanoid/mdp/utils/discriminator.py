@@ -27,5 +27,17 @@ class Discriminator(nn.Module):
 
     def forward(self, obs):
         norm_obs = self.amp_input_mean_std(obs)
-        out = self.disc_mlp(norm_obs)
-        return out
+        disc_logits = self.disc_mlp(norm_obs)
+
+        prob = 1 / (1 + torch.exp(-disc_logits))
+        disc_r = -torch.log(
+            torch.maximum(1 - prob,
+                            torch.tensor(0.0001, device="cuda:0")))
+
+        if False:
+            self._disc_reward_mean_std.train()
+            norm_disc_r = self._disc_reward_mean_std(disc_r.flatten())
+            disc_r = norm_disc_r.reshape(disc_r.shape)
+            disc_r = 0.5 * disc_r + 0.25
+
+        return disc_r

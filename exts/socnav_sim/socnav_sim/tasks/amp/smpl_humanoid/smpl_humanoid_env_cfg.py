@@ -30,14 +30,17 @@ class SmplHumanoidSceneCfg(InteractiveSceneCfg):
     """Configuration for the terrain scene with a smpl_humanoid robot."""
 
     # ground
-    ground = AssetBaseCfg(
+    ground = TerrainImporterCfg(
         prim_path="/World/ground",
-        spawn=sim_utils.GroundPlaneCfg(
-            size=(500, 500), 
-            color=(0.4, 0.6, 0.95),
-            physics_material=materials.RigidBodyMaterialCfg(static_friction=1.0,
-                                                            dynamic_friction=1.0,
-                                                            restitution=1.0))
+        collision_group=-1,
+        terrain_type="plane",
+        visual_material = sim_utils.PreviewSurfaceCfg(
+            diffuse_color=(0.4, 0.6, 0.95)
+        ),
+        physics_material=sim_utils.RigidBodyMaterialCfg(
+            static_friction=1.0,
+            dynamic_friction=1.0,
+        ),
     )
 
     # robots
@@ -105,9 +108,9 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
     location_reward = RewTerm(mdp.compute_location_reward,
-                              weight= 1.0)
+                              weight= 0.5)
     power_reward = RewTerm(mdp.compute_power_reward,
-                           weight=1.0)
+                           weight=0.5)
     amp_reward = RewTerm(obs_computer.compute_amp_reward,
                          weight=1.0)
 
@@ -134,7 +137,7 @@ class SmplHumanoidEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the MuJoCo-style Humanoid walking environment."""
 
     # Scene settings
-    scene: SmplHumanoidSceneCfg = SmplHumanoidSceneCfg(num_envs=8, env_spacing=10.0)
+    scene: SmplHumanoidSceneCfg = SmplHumanoidSceneCfg(num_envs=8, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
@@ -150,7 +153,7 @@ class SmplHumanoidEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 4
-        self.episode_length_s = 20
+        self.episode_length_s = 32
         # simulation settings
         self.sim.dt = 1 / 120.0
         self.sim.render_interval = self.decimation

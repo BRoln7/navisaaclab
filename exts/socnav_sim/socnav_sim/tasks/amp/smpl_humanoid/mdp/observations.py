@@ -48,7 +48,7 @@ trajectory_cfg = VisualizationMarkersCfg(
     prim_path="/World/Visuals/TrajectoryMarkers",
     markers={
         "marker": sim_utils.SphereCfg(
-            radius=0.1,
+            radius=0.05,
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 0.2)),
         ),
     }
@@ -230,9 +230,6 @@ class ObsComputer():
         joint_pos = asset.data.joint_pos[:, dof_sim_to_gym]
         joint_vel = asset.data.joint_vel[:, dof_sim_to_gym]
 
-        ############################################################
-        ################## todo: check subset ######################
-        ############################################################
         curr_amp_obs = build_amp_observations_smpl(
             spine_body_pos, spine_body_rot,
             spine_body_vel, spine_body_ang_vel,
