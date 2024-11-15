@@ -27,6 +27,8 @@ dof_vel_init = torch.tensor(
       2.7800e-01,  1.3214e-01, -1.9794e-02,  0.0000e+00,  0.0000e+00,
       0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00]]).to("cuda:0")
 
+flip_left_to_right_index = [0, 5, 6, 7, 8, 1, 2, 3, 4, 9, 10, 11, 12, 13, 19, 20, 21, 22, 23, 14, 15, 16, 17, 18]
+
 key_body_names = ["R_Ankle", "L_Ankle", "R_Wrist", "L_Wrist"]
 
 gym_dof_dict = {'L_Hip_x': 0, 'L_Hip_y': 1, 'L_Hip_z': 2, 'L_Knee_x': 3, 'L_Knee_y': 4, 'L_Knee_z': 5,

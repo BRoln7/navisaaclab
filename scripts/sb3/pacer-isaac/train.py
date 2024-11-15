@@ -7,6 +7,12 @@ parser.add_argument("--num_envs", type=int, default=32, help="Number of environm
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
+parser.add_argument("--checkpoint", type=str, default=None, help="Path to model checkpoint.")
+parser.add_argument(
+    "--use_last_checkpoint",
+    action="store_true",
+    help="When no checkpoint provided, use the last saved model. Otherwise use the best saved model.",
+)
 
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
@@ -27,7 +33,7 @@ from omni.isaac.lab.utils.dict import print_dict
 from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
 
 import omni.isaac.lab_tasks  # noqa: F401
-from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg
+from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg, get_checkpoint_path
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 import socnav_sim.tasks
 from feature_extractor import TaskMLP
@@ -51,6 +57,17 @@ def main():
     dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
     dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
 
+    log_root_path = os.path.join("logs", "sb3", args_cli.task)
+    log_root_path = os.path.abspath(log_root_path)
+    # if args_cli.checkpoint is None:
+    #     if args_cli.use_last_checkpoint:
+    #         checkpoint = "model_.*.zip"
+    #     else:
+    #         checkpoint = "model.zip"
+    #     checkpoint_path = get_checkpoint_path(log_root_path, ".*", checkpoint)
+    # else:
+    #     checkpoint_path = args_cli.checkpoint
+
     agent_cfg = process_sb3_cfg(agent_cfg) # type: ignore
     policy_arch = agent_cfg.pop("policy")
     n_timesteps = agent_cfg.pop("n_timesteps")
@@ -73,9 +90,12 @@ def main():
     agent = PPO(policy_arch, env, verbose=2, **agent_cfg, policy_kwargs=policy_kwargs)
     new_logger = configure(log_dir, ["stdout", "tensorboard"])
     agent.set_logger(new_logger)
-    checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'pacer_ac.pth')
+    checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'pacer_ppo.pth')
     checkpoint = torch.load(checkpoint_path)
     agent.policy.load_state_dict(checkpoint)
+
+    # agent = PPO.load(checkpoint_path, env, print_system_info=True)
+    print("agents loaded")
 
     checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=log_dir, name_prefix="model", verbose=2)
     agent.learn(total_timesteps=n_timesteps, callback=checkpoint_callback)

@@ -45,7 +45,6 @@ def main():
 
     log_root_path = os.path.join("logs", "sb3", args_cli.task)
     log_root_path = os.path.abspath(log_root_path)
-
     if args_cli.checkpoint is None:
         if args_cli.use_last_checkpoint:
             checkpoint = "model_.*.zip"
