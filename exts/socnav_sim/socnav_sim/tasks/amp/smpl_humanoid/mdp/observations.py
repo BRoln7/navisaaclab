@@ -20,7 +20,7 @@ from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.obs_utils import (
     build_amp_observations_smpl,
     dof_sim_to_gym,
     body_sim_to_gym,
-    flip_left_to_right_index
+    body_flip_left_to_right_index
 )
 import socnav_sim.tasks.amp.smpl_humanoid.mdp.isaac_utils.traj_generator as traj_generator
 from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.running_mean_std import RunningMeanStd
@@ -134,18 +134,18 @@ class ObsComputer():
         body_ang_vel = asset.data.body_ang_vel_w[:, body_sim_to_gym]
 
         body_pos[..., 1] *= -1 # position
-        body_pos = body_pos[..., flip_left_to_right_index, :]
+        body_pos = body_pos[..., body_flip_left_to_right_index, :]
 
         body_rot[..., 0] *= -1 # angular rotation, global
         body_rot[..., 2] *= -1
-        body_rot = body_rot[..., flip_left_to_right_index, :]
+        body_rot = body_rot[..., body_flip_left_to_right_index, :]
 
         body_vel[..., 1] *= -1 # linear velocity
-        body_vel = body_vel[..., flip_left_to_right_index, :]
+        body_vel = body_vel[..., body_flip_left_to_right_index, :]
 
         body_ang_vel[..., 0] *= -1 # angular velocity
         body_ang_vel[..., 2] *= -1
-        body_ang_vel = body_ang_vel[..., flip_left_to_right_index, :]
+        body_ang_vel = body_ang_vel[..., body_flip_left_to_right_index, :]
 
         obs = compute_humanoid_observations_smpl_max(body_pos, body_rot, body_vel, body_ang_vel, 
                                                     local_root_obs_config, local_height_obs_config, 

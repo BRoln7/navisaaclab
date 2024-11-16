@@ -36,7 +36,7 @@ import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg, get_checkpoint_path
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 import socnav_sim.tasks
-from feature_extractor import TaskMLP
+from feature_extractor import TaskMLP, SymPPO
 import os
 
 
@@ -87,7 +87,7 @@ def main():
         net_arch=dict(pi=[2048, 1024], vf=[2048, 1024]),
         activation_fn=torch.nn.ReLU)
 
-    agent = PPO(policy_arch, env, verbose=2, **agent_cfg, policy_kwargs=policy_kwargs)
+    agent = SymPPO(policy_arch, env, verbose=2, **agent_cfg, policy_kwargs=policy_kwargs)
     new_logger = configure(log_dir, ["stdout", "tensorboard"])
     agent.set_logger(new_logger)
     checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'pacer_ppo.pth')
