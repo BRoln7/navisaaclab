@@ -33,7 +33,7 @@ import torch
 from stable_baselines3 import PPO
 from omni.isaac.lab_tasks.utils.parse_cfg import load_cfg_from_registry, parse_env_cfg, get_checkpoint_path
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
-# from stable_baselines3.common.vec_env import VecNormalize
+from feature_extractor import SymPPO
 
 import socnav_sim.tasks  # noqa: F401
 
@@ -68,7 +68,7 @@ def main():
         shape= env.action_space.shape,
     )
 
-    agent_pacer = PPO.load(checkpoint_path, env, print_system_info=True)
+    agent_pacer = SymPPO.load(checkpoint_path, env, print_system_info=True)
     print("agents loaded")
 
     obs = env.reset()

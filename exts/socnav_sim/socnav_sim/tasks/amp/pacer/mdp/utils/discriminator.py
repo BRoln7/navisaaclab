@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.running_mean_std import RunningMeanStd
+from socnav_sim.tasks.amp.pacer.mdp.utils.running_mean_std import RunningMeanStd
 import os
 
 amp_input_shape = 1950

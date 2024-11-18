@@ -2,7 +2,7 @@ from omni.isaac.lab.envs.mdp.actions import JointActionCfg, JointAction, joint_a
 from omni.isaac.lab.utils import configclass
 from omni.isaac.lab.managers.action_manager import ActionTerm, ActionTermCfg
 from omni.isaac.lab.envs import ManagerBasedEnv
-from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.obs_utils import dof_gym_to_sim
+from socnav_sim.tasks.amp.pacer.mdp.utils.obs_utils import dof_gym_to_sim
 
 
 class JointPositionPacerAction(JointAction):

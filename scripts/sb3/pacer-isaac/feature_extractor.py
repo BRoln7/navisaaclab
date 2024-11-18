@@ -12,8 +12,8 @@ from gymnasium import spaces
 import numpy as np
 import random
 import os
-from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.running_mean_std import RunningMeanStd
-import socnav_sim.tasks.amp.smpl_humanoid.mdp.observations as mdpobs
+from socnav_sim.tasks.amp.pacer.mdp.utils.running_mean_std import RunningMeanStd
+import socnav_sim.tasks.amp.pacer.mdp.observations as mdpobs
 
 obs_shape = 1401
 self_humanoid_obs_size = 357
@@ -333,8 +333,10 @@ class SymPPO(PPO):
 
 
     def get_sym_loss(self, flip_observations, origin_observations):
-        flip_obs_norm = self._preproc_obs(flip_observations)
-        orig_obs_norm = self._preproc_obs(origin_observations)
+        # flip_obs_norm = self._preproc_obs(flip_observations)
+        # orig_obs_norm = self._preproc_obs(origin_observations)
+        flip_obs_norm = flip_observations
+        orig_obs_norm = origin_observations       
         s_loss = self._sym_loss(flip_obs_norm.cpu(), orig_obs_norm.cpu())
         s_loss = torch.mean(s_loss)
         return s_loss

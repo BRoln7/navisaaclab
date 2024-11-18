@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from omni.isaac.lab.assets import Articulation
 from omni.isaac.lab.managers import SceneEntityCfg
-from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.obs_utils import (
+from socnav_sim.tasks.amp.pacer.mdp.utils.obs_utils import (
     compute_humanoid_observations_smpl_max,
     rot_wxyz_to_xyzw,
     root_states_wxyz_to_xyzw,
@@ -22,12 +22,12 @@ from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.obs_utils import (
     body_sim_to_gym,
     body_flip_left_to_right_index
 )
-import socnav_sim.tasks.amp.smpl_humanoid.mdp.isaac_utils.traj_generator as traj_generator
-from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.running_mean_std import RunningMeanStd
-from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.discriminator import Discriminator
+import socnav_sim.tasks.amp.pacer.mdp.isaac_utils.traj_generator as traj_generator
+from socnav_sim.tasks.amp.pacer.mdp.utils.running_mean_std import RunningMeanStd
+from socnav_sim.tasks.amp.pacer.mdp.utils.discriminator import Discriminator
 from omni.isaac.lab.markers import VisualizationMarkersCfg, VisualizationMarkers
 import omni.isaac.lab.sim as sim_utils
-import socnav_sim.tasks.amp.smpl_humanoid.mdp.reset as Reset
+import socnav_sim.tasks.amp.pacer.mdp.reset as Reset
 
 # config params
 dof_subset = torch.tensor([ 
@@ -262,8 +262,6 @@ class ObsComputer():
         spine_body_vel = asset.data.body_lin_vel_w[:, spine_id[0], :].squeeze(1)
         spine_body_ang_vel = asset.data.body_ang_vel_w[:, spine_id[0], :].squeeze(1)
 
-        joint_pos = torch.zeros((env.num_envs, asset.num_joints), device=env.device)
-        joint_vel = torch.zeros((env.num_envs, asset.num_joints), device=env.device)
         joint_pos = asset.data.joint_pos[:, dof_sim_to_gym]
         joint_vel = asset.data.joint_vel[:, dof_sim_to_gym]
 

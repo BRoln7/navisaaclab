@@ -59,14 +59,6 @@ def main():
 
     log_root_path = os.path.join("logs", "sb3", args_cli.task)
     log_root_path = os.path.abspath(log_root_path)
-    # if args_cli.checkpoint is None:
-    #     if args_cli.use_last_checkpoint:
-    #         checkpoint = "model_.*.zip"
-    #     else:
-    #         checkpoint = "model.zip"
-    #     checkpoint_path = get_checkpoint_path(log_root_path, ".*", checkpoint)
-    # else:
-    #     checkpoint_path = args_cli.checkpoint
 
     agent_cfg = process_sb3_cfg(agent_cfg) # type: ignore
     policy_arch = agent_cfg.pop("policy")
@@ -82,22 +74,29 @@ def main():
         shape= env.action_space.shape,
     )
 
-    policy_kwargs = dict(
+    if args_cli.checkpoint is None:
+        policy_kwargs = dict(
         features_extractor_class=TaskMLP,
         net_arch=dict(pi=[2048, 1024], vf=[2048, 1024]),
         activation_fn=torch.nn.ReLU)
 
-    agent = SymPPO(policy_arch, env, verbose=2, **agent_cfg, policy_kwargs=policy_kwargs)
-    new_logger = configure(log_dir, ["stdout", "tensorboard"])
-    agent.set_logger(new_logger)
-    checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'pacer_ppo.pth')
-    checkpoint = torch.load(checkpoint_path)
-    agent.policy.load_state_dict(checkpoint)
+        agent = SymPPO(policy_arch, env, verbose=2, **agent_cfg, policy_kwargs=policy_kwargs)
+        new_logger = configure(log_dir, ["stdout", "tensorboard"])
+        agent.set_logger(new_logger)
+        checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'pacer_ppo.pth')
+        checkpoint = torch.load(checkpoint_path)
+        agent.policy.load_state_dict(checkpoint)
+        print("[INFO]:agents loaded")
 
-    # agent = PPO.load(checkpoint_path, env, print_system_info=True)
-    print("agents loaded")
+    else:
+        checkpoint_path = args_cli.checkpoint
+        agent = SymPPO.load(checkpoint_path, env, print_system_info=True)
+        new_logger = configure(log_dir, ["stdout", "tensorboard"])
+        agent.set_logger(new_logger)
+        print("[INFO]:agents loaded")
 
-    checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=log_dir, name_prefix="model", verbose=2)
+
+    checkpoint_callback = CheckpointCallback(save_freq=5000, save_path=log_dir, name_prefix="model", verbose=2)
     agent.learn(total_timesteps=n_timesteps, callback=checkpoint_callback)
     agent.save(os.path.join(log_dir, "model"))
 

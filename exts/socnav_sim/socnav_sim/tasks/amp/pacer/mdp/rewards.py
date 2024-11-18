@@ -2,10 +2,10 @@ import torch
 from omni.isaac.lab.envs import ManagerBasedEnv
 from omni.isaac.lab.assets import Articulation
 from omni.isaac.lab.managers import SceneEntityCfg
-from socnav_sim.tasks.amp.smpl_humanoid.mdp.utils.rewards_utils import (
+from socnav_sim.tasks.amp.pacer.mdp.utils.rewards_utils import (
     compute_location_rew,
 )
-import socnav_sim.tasks.amp.smpl_humanoid.mdp.observations as obs
+import socnav_sim.tasks.amp.pacer.mdp.observations as obs
 power_coefficient = 0.0005
 
 def compute_location_reward(env: ManagerBasedEnv, 

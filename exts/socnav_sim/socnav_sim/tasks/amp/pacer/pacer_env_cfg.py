@@ -17,7 +17,7 @@ from omni.isaac.lab.terrains import TerrainImporterCfg
 from omni.isaac.lab.utils import configclass
 
 from socnav_sim.assets.smpl_humanoid import SMPL_HUMANOID_CFG
-import socnav_sim.tasks.amp.smpl_humanoid.mdp as mdp
+import socnav_sim.tasks.amp.pacer.mdp as mdp
 
 ##
 # Scene definition
@@ -26,7 +26,7 @@ import socnav_sim.tasks.amp.smpl_humanoid.mdp as mdp
 obs_computer = mdp.ObsComputer()
 
 @configclass
-class SmplHumanoidSceneCfg(InteractiveSceneCfg):
+class PacerSceneCfg(InteractiveSceneCfg):
     """Configuration for the terrain scene with a smpl_humanoid robot."""
 
     # ground
@@ -122,7 +122,7 @@ class TerminationsCfg:
     # (1) Terminate if the trajectory ends
     trajectory_end = DoneTerm(func=mdp.time_out, time_out=True)
     # (2) Terminate if the robot falls
-    torso_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.6})
+    torso_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.15})
 
 
 @configclass
@@ -133,11 +133,11 @@ class CurriculumCfg:
 
 
 @configclass
-class SmplHumanoidEnvCfg(ManagerBasedRLEnvCfg):
+class PacerEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the MuJoCo-style Humanoid walking environment."""
 
     # Scene settings
-    scene: SmplHumanoidSceneCfg = SmplHumanoidSceneCfg(num_envs=8, env_spacing=2.5)
+    scene: PacerSceneCfg = PacerSceneCfg(num_envs=8, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
