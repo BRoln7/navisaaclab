@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from omni.isaac.lab.assets import Articulation
 from omni.isaac.lab.managers import SceneEntityCfg
-from socnav_sim.tasks.amp.pacer.mdp.utils.obs_utils import (
+from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
     compute_humanoid_observations_smpl_max,
     rot_wxyz_to_xyzw,
     root_states_wxyz_to_xyzw,
@@ -22,9 +22,9 @@ from socnav_sim.tasks.amp.pacer.mdp.utils.obs_utils import (
     body_sim_to_gym,
     body_flip_left_to_right_index
 )
-import socnav_sim.tasks.amp.pacer.mdp.isaac_utils.traj_generator as traj_generator
-from socnav_sim.tasks.amp.pacer.mdp.utils.running_mean_std import RunningMeanStd
-from socnav_sim.tasks.amp.pacer.mdp.utils.discriminator import Discriminator
+import socnav_sim.tasks.amp.amp_utils.isaac_utils.traj_generator as traj_generator
+from socnav_sim.tasks.amp.amp_utils.utils.running_mean_std import RunningMeanStd
+from socnav_sim.tasks.amp.amp_utils.utils.discriminator import Discriminator
 from omni.isaac.lab.markers import VisualizationMarkersCfg, VisualizationMarkers
 import omni.isaac.lab.sim as sim_utils
 import socnav_sim.tasks.amp.pacer.mdp.reset as Reset

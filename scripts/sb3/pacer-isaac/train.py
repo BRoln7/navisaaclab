@@ -36,7 +36,7 @@ import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg, get_checkpoint_path
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 import socnav_sim.tasks
-from feature_extractor import TaskMLP, SymPPO
+from policy import TaskMLP, SymPPO
 import os
 
 

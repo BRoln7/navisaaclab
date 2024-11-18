@@ -2,7 +2,7 @@ import torch
 from omni.isaac.lab.envs import ManagerBasedEnv
 from omni.isaac.lab.assets import Articulation
 from omni.isaac.lab.managers import SceneEntityCfg
-from socnav_sim.tasks.amp.pacer.mdp.utils.rewards_utils import (
+from socnav_sim.tasks.amp.amp_utils.utils.rewards_utils import (
     compute_location_rew,
 )
 import socnav_sim.tasks.amp.pacer.mdp.observations as obs
