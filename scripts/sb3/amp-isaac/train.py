@@ -28,15 +28,16 @@ import torch
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.logger import configure
+from stable_baselines3.common.vec_env import VecNormalize
 
 from omni.isaac.lab.utils.dict import print_dict
 from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
 
 import omni.isaac.lab_tasks  # noqa: F401
+import numpy as np
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg, get_checkpoint_path
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 import socnav_sim.tasks
-from policy import TaskMLP
 import os
 
 
@@ -68,6 +69,16 @@ def main():
     env = Sb3VecEnvWrapper(env) # type: ignore
     env.seed(seed=agent_cfg["seed"])
 
+    env = VecNormalize(
+        env,
+        training=True,
+        norm_obs=True,
+        norm_reward=True,
+        clip_obs=np.inf,
+        gamma=agent_cfg["gamma"],
+        clip_reward=np.inf,
+    )
+
     env.action_space = gym.spaces.Box(
         low = -1,
         high = 1,
@@ -76,16 +87,15 @@ def main():
 
     if args_cli.checkpoint is None:
         policy_kwargs = dict(
-        features_extractor_class=TaskMLP,
-        net_arch=dict(pi=[2048, 1024], vf=[2048, 1024]),
+        net_arch=dict(pi=[1024, 512], vf=[1024, 512]),
         activation_fn=torch.nn.ReLU)
 
         agent = PPO(policy_arch, env, verbose=2, **agent_cfg, policy_kwargs=policy_kwargs)
         new_logger = configure(log_dir, ["stdout", "tensorboard"])
         agent.set_logger(new_logger)
-        checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'pacer_ppo.pth')
-        checkpoint = torch.load(checkpoint_path)
-        agent.policy.load_state_dict(checkpoint)
+        # checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'pacer_ppo.pth')
+        # checkpoint = torch.load(checkpoint_path)
+        # agent.policy.load_state_dict(checkpoint)
         print("[INFO]:agents loaded")
 
     else:

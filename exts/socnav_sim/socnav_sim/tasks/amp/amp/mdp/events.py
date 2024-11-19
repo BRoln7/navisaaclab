@@ -3,7 +3,7 @@ import torch
 from omni.isaac.lab.managers import SceneEntityCfg
 from omni.isaac.lab.assets import Articulation, RigidObject
 import omni.isaac.lab.utils.math as math_utils
-from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import dof_pos_init, dof_vel_init
+from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import dof_gym_to_sim
 from socnav_sim.tasks.amp.amp_utils.utils.load_motion import MotionLoad
 
 
@@ -36,7 +36,6 @@ def reset_root_state_motion(
     # set into the physics simulation
     asset.write_root_pose_to_sim(torch.cat([positions, orientations], dim=-1), env_ids=env_ids) # type: ignore
     asset.write_root_velocity_to_sim(velocities, env_ids=env_ids) # type: ignore
-
     asset.write_joint_state_to_sim(position=dof_pos_init, velocity=dof_vel_init, env_ids=env_ids) # type: ignore
 
 num_envs = 16
@@ -51,7 +50,7 @@ def reset_init_state_amp_motion(
 ):
     asset: RigidObject | Articulation = env.scene[asset_cfg.name]
 
-    # set root pose
+    # reset root pose
     root_states = asset.data.default_root_state[env_ids].clone()
     range_list = [pose_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z", "roll", "pitch", "yaw"]]
     ranges = torch.tensor(range_list, device=asset.device)
@@ -66,6 +65,7 @@ def reset_init_state_amp_motion(
     asset.write_root_pose_to_sim(torch.cat([positions, orientations], dim=-1), env_ids=env_ids) # type: ignore
     asset.write_root_velocity_to_sim(velocities, env_ids=env_ids) # type: ignore
 
-    # set dof pose
+    # reset dof pose
     motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, \
       root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = motion_load.sample_ref_state(env.num_envs)
+    asset.write_joint_state_to_sim(position=dof_pos[:, dof_gym_to_sim], velocity=dof_vel[:, dof_gym_to_sim], env_ids=env_ids) # type: ignore

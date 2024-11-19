@@ -3,8 +3,8 @@ import os
 import numpy as np
 from socnav_sim.tasks.amp.amp_utils.isaac_utils.flags import flags
 from socnav_sim.tasks.amp.amp_utils.isaac_utils.motion_lib_smpl import MotionLib as MotionLibSMPL
-from poselib.poselib.skeleton.skeleton3d import SkeletonTree
-from uhc.smpllib.smpl_parser import SMPL_Parser
+from poselib.skeleton.skeleton3d import SkeletonTree
+from socnav_sim.uhc.smpllib.smpl_parser import SMPL_Parser
 
 class MotionLoad():
     def __init__(self, num_envs):

@@ -9,22 +9,19 @@ from ast import If
 import numpy as np
 import os
 import yaml
+import sys
 from tqdm import tqdm
 
-from poselib.poselib.core.rotation3d import *
-from socnav_sim.tasks.amp.amp_utils.isaac_utils.gym_utils import *
+from poselib.core.rotation3d import *
+from socnav_sim.tasks.amp.amp_utils.isaac_utils.gym_utils import * # type: ignore
 from socnav_sim.tasks.amp.amp_utils.isaac_utils import torch_utils
 import joblib
 import torch
-from poselib.poselib.skeleton.skeleton3d import SkeletonMotion, SkeletonState
+from poselib.skeleton.skeleton3d import SkeletonMotion, SkeletonState
 import torch.multiprocessing as mp
 import copy
 import gc
-from uhc.smpllib.smpl_parser import (
-    SMPL_Parser,
-    SMPLH_Parser,
-    SMPLX_Parser,
-)
+from socnav_sim.uhc.smpllib.smpl_parser import SMPL_Parser
 
 USE_CACHE = True
 print("MOVING MOTION DATA TO GPU, USING CACHE:", USE_CACHE)

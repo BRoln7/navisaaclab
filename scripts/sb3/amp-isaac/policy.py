@@ -12,10 +12,10 @@ from gymnasium import spaces
 import numpy as np
 import random
 import os
-from socnav_sim.tasks.amp.pacer.mdp.utils.running_mean_std import RunningMeanStd
+from socnav_sim.tasks.amp.amp_utils.utils.running_mean_std import RunningMeanStd
 import socnav_sim.tasks.amp.pacer.mdp.observations as mdpobs
 
-obs_shape = 1401
+obs_shape = 357
 self_humanoid_obs_size = 357
 SEED = 4801
 seed = 0
@@ -26,10 +26,10 @@ os.environ['PYTHONHASHSEED'] = str(seed)
 torch.cuda.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 
-checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'Humanoid.pth')
-running_mean_std_params = torch.load(checkpoint_path)
+# checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'Humanoid.pth')
+# running_mean_std_params = torch.load(checkpoint_path)
 running_mean_std = RunningMeanStd(obs_shape).to("cuda:0")
-running_mean_std.load_state_dict(running_mean_std_params['running_mean_std'])
+# running_mean_std.load_state_dict(running_mean_std_params['running_mean_std'])
 running_mean_std.eval()
 print("[INFO]:running_mean_std init")
 

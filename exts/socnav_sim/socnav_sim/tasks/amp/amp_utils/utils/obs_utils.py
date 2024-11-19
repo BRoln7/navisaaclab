@@ -1,5 +1,5 @@
 import torch
-from socnav_sim.tasks.amp.pacer.mdp.isaac_utils import torch_utils, gym_utils
+from socnav_sim.tasks.amp.amp_utils.isaac_utils import torch_utils, gym_utils
 
 dof_pos_init = torch.tensor(
     [[-0.0140, -0.4742, -0.1278,  0.0699,  0.1536,  0.0104,  0.0312,  0.1021,
