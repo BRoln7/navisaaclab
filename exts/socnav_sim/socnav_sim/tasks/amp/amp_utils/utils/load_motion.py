@@ -27,8 +27,8 @@ class MotionLoad():
         sk_tree = SkeletonTree.from_mjcf(skeleton_trees_xml)
         self.skeleton_trees = [sk_tree] * num_envs
         self.motion_lib.load_motions(skeleton_trees = self.skeleton_trees, 
-                                gender_betas = self.humanoid_betas.cpu().repeat(num_envs), 
-                                limb_weights = self.humanoid_limb_and_weights.cpu().repeat(num_envs), 
+                                gender_betas = self.humanoid_betas.cpu().repeat(num_envs, 1), 
+                                limb_weights = self.humanoid_limb_and_weights.cpu().repeat(num_envs, 1), 
                                 random_sample=not HACK_MOTION_SYNC)
 
         data_dir = "data/smpl"

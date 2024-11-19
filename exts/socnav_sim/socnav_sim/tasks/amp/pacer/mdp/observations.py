@@ -275,12 +275,12 @@ class ObsComputer():
         if self.amp_hist_buff is None:
             self.amp_hist_buff = curr_amp_obs
         else:
-            self.amp_hist_buff = torch.cat((self.amp_hist_buff.clone(), curr_amp_obs), dim=1)
+            self.amp_hist_buff = torch.cat((curr_amp_obs, self.amp_hist_buff.clone()), dim=1)
 
         if self.amp_hist_buff.size(1) == amp_obs_shape:
             amp_obs = self.amp_hist_buff
             amp_reward = self.discriminator(amp_obs)
-            self.amp_hist_buff = self.amp_hist_buff[:, 1*amp_obs_shape_step:]
+            self.amp_hist_buff = self.amp_hist_buff[:, :9*amp_obs_shape_step]
             amp_reward = amp_reward.squeeze(-1)
             reward = amp_reward.clone().detach()
 

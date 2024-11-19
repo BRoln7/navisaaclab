@@ -68,4 +68,4 @@ def reset_init_state_amp_motion(
     # reset dof pose
     motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, \
       root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = motion_load.sample_ref_state(env.num_envs)
-    asset.write_joint_state_to_sim(position=dof_pos[:, dof_gym_to_sim], velocity=dof_vel[:, dof_gym_to_sim], env_ids=env_ids) # type: ignore
+    asset.write_joint_state_to_sim(position=dof_pos[:,dof_gym_to_sim][env_ids], velocity=dof_vel[:,dof_gym_to_sim][env_ids], env_ids=env_ids) # type: ignore

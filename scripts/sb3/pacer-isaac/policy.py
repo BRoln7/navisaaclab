@@ -12,7 +12,7 @@ from gymnasium import spaces
 import numpy as np
 import random
 import os
-from socnav_sim.tasks.amp.pacer.mdp.utils.running_mean_std import RunningMeanStd
+from socnav_sim.tasks.amp.amp_utils.utils.running_mean_std import RunningMeanStd
 import socnav_sim.tasks.amp.pacer.mdp.observations as mdpobs
 
 obs_shape = 1401

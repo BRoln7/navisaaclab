@@ -70,7 +70,7 @@ class ActionsCfg:
     """Action specifications for the MDP."""
 
     joint_pos = mdp.JointPositionActionAMPCfg(
-        asset_name="robot", joint_names=[".*"], scale=3.1416, offset=0.0,
+        asset_name="robot", joint_names=[".*"], scale=0.0, offset=0.0,
     )
 
 
@@ -107,6 +107,8 @@ class RewardsCfg:
     """Reward terms for the MDP."""
     power_reward = RewTerm(mdp.compute_power_reward,
                            weight=0.5)
+    amp_reward = RewTerm(obs_computer.compute_amp_reward,
+                         weight=1.0)
 
 
 @configclass
