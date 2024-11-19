@@ -23,6 +23,7 @@ import socnav_sim.tasks.amp.amp.mdp as mdp
 # Scene definition
 ##
 
+obs_computer = mdp.ObsComputer()
 
 @configclass
 class AMPSceneCfg(InteractiveSceneCfg):
@@ -80,7 +81,7 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         """Observations for the policy."""
-        # humanoid_obs = ObsTerm(func=obs_computer.compute_humanoid_obs)
+        humanoid_obs = ObsTerm(func=obs_computer.compute_humanoid_obs)
 
         def __post_init__(self):
             self.enable_corruption = False
