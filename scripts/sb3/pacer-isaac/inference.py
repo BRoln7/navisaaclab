@@ -33,7 +33,7 @@ import torch
 from stable_baselines3 import PPO
 from omni.isaac.lab_tasks.utils.parse_cfg import load_cfg_from_registry, parse_env_cfg, get_checkpoint_path
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
-from feature_extractor import SymPPO
+from policy import SymPPO
 
 import socnav_sim.tasks  # noqa: F401
 

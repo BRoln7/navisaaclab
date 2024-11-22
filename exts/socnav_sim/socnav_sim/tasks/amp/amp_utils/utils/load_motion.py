@@ -2,7 +2,7 @@ import torch
 import os
 import numpy as np
 from socnav_sim.tasks.amp.amp_utils.isaac_utils.flags import flags
-from socnav_sim.tasks.amp.amp_utils.isaac_utils.motion_lib_smpl import MotionLib as MotionLibSMPL
+from socnav_sim.tasks.amp.amp_utils.utils.motion_lib_smpl import MotionLib as MotionLibSMPL
 from poselib.skeleton.skeleton3d import SkeletonTree
 from socnav_sim.uhc.smpllib.smpl_parser import SMPL_Parser
 
@@ -51,6 +51,7 @@ class MotionLoad():
             motion_ids, motion_times, curr_gender_betas)
 
         return motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot
+
 
     def get_fixed_smpl_state_from_motionlib(self, motion_ids, motion_times, curr_gender_betas):
         motion_res = self.get_smpl_state_from_motionlib_cache(motion_ids, motion_times)

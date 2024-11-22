@@ -22,7 +22,7 @@ from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
     body_sim_to_gym,
     body_flip_left_to_right_index
 )
-import socnav_sim.tasks.amp.amp_utils.isaac_utils.traj_generator as traj_generator
+import socnav_sim.tasks.amp.amp_utils.utils.traj_generator as traj_generator
 from socnav_sim.tasks.amp.amp_utils.utils.running_mean_std import RunningMeanStd
 from socnav_sim.tasks.amp.amp_utils.utils.discriminator import Discriminator
 from omni.isaac.lab.markers import VisualizationMarkersCfg, VisualizationMarkers
