@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import torch
+import os
+import yaml
 from typing import TYPE_CHECKING
 
 from omni.isaac.lab.assets import Articulation
@@ -20,18 +22,23 @@ from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
     dof_subset
 )
 import socnav_sim.tasks.amp.amp.policy as policy
+import socnav_sim.tasks.amp.amp.mdp.events as events
+import socnav_sim.tasks.amp.amp.mdp.reset as reset
 import omni.isaac.lab.sim as sim_utils
 
 # config params
 
+motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'amp.yaml')
+with open(motion_file, 'r') as file:
+    config = yaml.safe_load(file)
+num_envs = config['env']['num_envs'] # type: ignore
+
 amp_obs_shape = 1950
 amp_obs_shape_step = 195
-flip_humanoid_obs = None
-
+amp_replay_obs = torch.tensor([]).to("cuda:0")
 
 if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedEnv, ManagerBasedRLEnv
-
 
 #########################################################################################
 ##################################### function for obs ################################## 
@@ -46,7 +53,6 @@ class ObsComputer():
         self._traj_sample_timestep = 0.5
         self._traj_gen_init = False
         self._traj_gen = None
-        self.progress_buf = None
         self._has_upright_start = True
         self.height_meas_scale = 5
         self.num_height_points = 1024
@@ -56,7 +62,13 @@ class ObsComputer():
         self._has_dof_subset = True
         self._has_shape_obs_disc = False
         self.dof_subset = dof_subset
-        self.amp_hist_buff = None
+
+        self.amp_init_flag = False
+        self.amp_obs_buf = torch.zeros(
+            (num_envs, 10, amp_obs_shape_step), device="cuda:0", dtype=torch.float)
+        self.curr_amp_obs_buf = self.amp_obs_buf[:, 0]
+        self.hist_amp_obs_buf = self.amp_obs_buf[:, 1:]
+
 
     def compute_humanoid_obs(self, 
                              env: ManagerBasedEnv, 
@@ -83,6 +95,7 @@ class ObsComputer():
                         env: ManagerBasedEnv, 
                         asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
                         ) -> torch.Tensor:
+        # calculate current amp observation
         asset: Articulation = env.scene[asset_cfg.name]
 
         key_body_ids = asset.find_bodies(key_body_names)
@@ -105,20 +118,59 @@ class ObsComputer():
             self.dof_subset, 
             self._local_root_obs, self._amp_root_height_obs, self._has_dof_subset, self._has_upright_start)
 
-        if self.amp_hist_buff is None:
-            self.amp_hist_buff = curr_amp_obs
-        else:
-            self.amp_hist_buff = torch.cat((self.amp_hist_buff.clone(), curr_amp_obs), dim=1)
+        # init history amp observation
+        if self.amp_init_flag == False:
+            self.amp_init_flag = True
+            self.reset_amp_obs(torch.arange(0, env.num_envs, 1),
+                               events.amp_motion_ids,
+                               events.amp_motion_times)
+        # update history amp observation
+        # reset
+        if reset.fall_reset_env_ids.numel() != 0:
+            self.reset_amp_obs(reset.fall_reset_env_ids, events.amp_motion_ids, events.amp_motion_times)
+        if reset.time_out_env_ids.numel() != 0:
+            self.reset_amp_obs(reset.time_out_env_ids, events.amp_motion_ids, events.amp_motion_times)
 
-        if self.amp_hist_buff.size(1) == amp_obs_shape:
-            amp_obs = self.amp_hist_buff
-            amp_reward = policy.discriminator(amp_obs)
-            self.amp_hist_buff = self.amp_hist_buff[:, 1*amp_obs_shape_step:]
-            amp_reward = amp_reward.squeeze(-1)
-            reward = amp_reward.clone().detach()
+        self.amp_obs_buf = torch.cat((curr_amp_obs.reshape(env.num_envs, 1, -1), 
+                                      self.hist_amp_obs_buf), dim=1)
+        self.hist_amp_obs_buf = self.amp_obs_buf[:, 0:9]
+        # calculate amp reward
+        amp_reward = policy.discriminator(self.amp_obs_buf.reshape(num_envs, -1)).squeeze(1)
+        reward = amp_reward.clone().detach()
 
-            return reward
-            # return torch.zeros(env.num_envs).to("cuda:0")
+        # record amp_replay_obs
+        global amp_replay_obs
+        amp_replay_obs = self.amp_obs_buf.reshape(num_envs, -1).unsqueeze(0)
+
+        return reward
         
-        else:
-            return torch.zeros(env.num_envs).to("cuda:0")
+    def reset_amp_obs(self, env_ids, motion_ids, motion_times):
+        dt = 1 / 120
+
+        motion_ids = motion_ids[env_ids]
+        motion_times = motion_times[env_ids]
+        motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, 9])
+        motion_times = motion_times.unsqueeze(-1)
+
+        time_steps = -dt * (torch.arange(0, 9, device='cuda:0') + 1)
+        motion_times = motion_times + time_steps
+
+        motion_ids = motion_ids.view(-1)
+        motion_times = motion_times.view(-1)
+
+        motion_res = policy.motion_load.get_smpl_state_from_motionlib_cache(motion_ids, motion_times)
+
+        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, \
+            key_pos, smpl_params, limb_weights, pose_aa, rb_pos, rb_rot, body_vel, body_ang_vel = \
+            motion_res["root_pos"], motion_res["root_rot"], motion_res["dof_pos"], motion_res["root_vel"], \
+                motion_res["root_ang_vel"], motion_res["dof_vel"], motion_res["key_pos"], motion_res["motion_bodies"], \
+                    motion_res["motion_limb_weights"], motion_res["motion_aa"], motion_res["rg_pos"], \
+                        motion_res["rb_rot"], motion_res["body_vel"], motion_res["body_ang_vel"]
+
+        amp_obs_demo = build_amp_observations_smpl(
+            root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel,
+            key_pos, dof_subset, self._local_root_obs,
+            self._amp_root_height_obs, self._has_dof_subset, self._has_upright_start)
+
+        self.hist_amp_obs_buf[env_ids] = amp_obs_demo.view(self.hist_amp_obs_buf[env_ids].shape)
+        
