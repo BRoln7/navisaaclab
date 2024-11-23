@@ -32,8 +32,7 @@ class Discriminator(nn.Module):
         disc_r = -torch.log(
             torch.maximum(1 - prob,
                             torch.tensor(0.0001, device="cuda:0")))
-        return disc_r
-    
+        return disc_r    
     
 def bias_init(module):
     mlp_init = torch.nn.Identity()

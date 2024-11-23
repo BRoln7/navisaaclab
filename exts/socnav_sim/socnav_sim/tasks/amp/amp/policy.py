@@ -17,6 +17,7 @@ from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
 from socnav_sim.tasks.amp.amp_utils.utils.replay_buffer import ReplayBuffer
 from socnav_sim.tasks.amp.amp_utils.utils.load_motion import MotionLoad
 from socnav_sim.tasks.amp.amp_utils.utils.discriminator import Discriminator, bias_init
+from socnav_sim.tasks.amp.amp_utils.isaac_utils.gym_utils import to_torch
 
 import importlib
 
@@ -47,7 +48,6 @@ motion_load = MotionLoad(num_envs)
 class AMPDemoBuffer():
     def __init__(self):
         self._amp_obs_demo_buffer = ReplayBuffer(amp_demo_buffer_size, "cuda:0")
-        self.amp_obs_demo_buf = None
         self.amp_batch_size = amp_batch_size
         self.num_amp_obs_steps = 10
         self.num_amp_obs_per_step = 195
@@ -75,7 +75,7 @@ class AMPDemoBuffer():
     def fetch_amp_obs_demo(self, num_samples):
         # Creates the reference motion amp obs. For discrinminiator
 
-        if (self.amp_obs_demo_buf is None):
+        if (self._amp_obs_demo_buf is None):
             self._build_amp_obs_demo_buf(num_samples)
         else:
             assert (self._amp_obs_demo_buf.shape[0] == num_samples)
@@ -125,6 +125,9 @@ class AMPDemoBuffer():
 
     def get_num_amp_obs(self):
         return self.num_amp_obs_steps * self.num_amp_obs_per_step
+    
+    def sample(self, num_samples):
+        return self._amp_obs_demo_buffer.sample(num_samples)
 
 
 ################################################################
@@ -152,8 +155,27 @@ class AMPPPO(PPO):
         self.amp_demo_buffer = AMPDemoBuffer()
         self.amp_demo_buffer.init_amp_demo_buf()
         # replay buffer
-        self.amp_replay_buffer = torch.tensor([]).to("cuda:0")
+        self.amp_buffer = torch.tensor([]).to("cuda:0")
+        self.amp_replay_buffer = ReplayBuffer(amp_demo_buffer_size, "cuda:0")
 
+        self._amp_replay_keep_prob = 0.01
+
+    def _store_replay_amp_obs(self, amp_obs):
+        buf_size = self.amp_replay_buffer.get_buffer_size()
+        buf_total_count = self.amp_replay_buffer.get_total_count()
+        if (buf_total_count > buf_size):
+            keep_probs = to_torch(np.array([self._amp_replay_keep_prob] *
+                                           amp_obs.shape[0]), device="cuda:0")
+            keep_mask = torch.bernoulli(keep_probs) == 1.0
+            amp_obs = amp_obs[keep_mask]
+
+        if (amp_obs.shape[0] > buf_size):
+            rand_idx = torch.randperm(amp_obs.shape[0])
+            rand_idx = rand_idx[:buf_size]
+            amp_obs = amp_obs[rand_idx]
+
+        self.amp_replay_buffer.store({'amp_obs': amp_obs})
+        return
 
     def collect_rollouts(
         self,
@@ -178,7 +200,7 @@ class AMPPPO(PPO):
         callback.on_rollout_start()
         
         ################### clear buffer ######################
-        self.amp_replay_buffer = torch.tensor([]).to("cuda:0")
+        self.amp_buffer = torch.tensor([]).to("cuda:0")
 
         while n_steps < n_rollout_steps:
             if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
@@ -247,10 +269,10 @@ class AMPPPO(PPO):
             ######################################################
             ############## collect extra info here ###############
             ######################################################
-            if self.amp_replay_buffer.numel() == 0:
-                self.amp_replay_buffer = obs.amp_replay_obs
+            if self.amp_buffer.numel() == 0:
+                self.amp_buffer = obs.amp_replay_obs
             else:
-                self.amp_replay_buffer = torch.cat((self.amp_replay_buffer, obs.amp_replay_obs), dim=0)
+                self.amp_buffer = torch.cat((self.amp_buffer, obs.amp_replay_obs), dim=0)
 
 
         with torch.no_grad():
@@ -268,7 +290,21 @@ class AMPPPO(PPO):
 
     def train(self) -> None:
         super().train()
+
+        amp_obs = self.amp_buffer
+
         self.amp_demo_buffer.update_amp_demos()
+        num_obs_samples = self.amp_buffer.shape[0] * self.amp_buffer.shape[1]
+        amp_obs_demo = self.amp_demo_buffer.sample(num_obs_samples)['amp_obs']
+
+        self._store_replay_amp_obs(self.amp_buffer.reshape(-1, self.amp_buffer.shape[2]))
+        amp_obs_replay = self.amp_demo_buffer.sample(num_obs_samples)['amp_obs']
+
+
+        
+
+        
+        
 
 
 
