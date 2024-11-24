@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from torch.optim import Adam
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecEnv
@@ -6,6 +7,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.utils import obs_as_tensor
 import numpy as np
+import math
 import random
 import os
 import yaml
@@ -18,7 +20,7 @@ from socnav_sim.tasks.amp.amp_utils.utils.replay_buffer import ReplayBuffer
 from socnav_sim.tasks.amp.amp_utils.utils.load_motion import MotionLoad
 from socnav_sim.tasks.amp.amp_utils.utils.discriminator import Discriminator, bias_init
 from socnav_sim.tasks.amp.amp_utils.isaac_utils.gym_utils import to_torch
-
+from socnav_sim.tasks.amp.amp_utils.utils.running_mean_std import RunningMeanStd
 import importlib
 
 obs_shape = 357
@@ -48,6 +50,7 @@ motion_load = MotionLoad(num_envs)
 class AMPDemoBuffer():
     def __init__(self):
         self._amp_obs_demo_buffer = ReplayBuffer(amp_demo_buffer_size, "cuda:0")
+        self._amp_obs_demo = None
         self.amp_batch_size = amp_batch_size
         self.num_amp_obs_steps = 10
         self.num_amp_obs_per_step = 195
@@ -75,18 +78,16 @@ class AMPDemoBuffer():
     def fetch_amp_obs_demo(self, num_samples):
         # Creates the reference motion amp obs. For discrinminiator
 
-        if (self._amp_obs_demo_buf is None):
-            self._build_amp_obs_demo_buf(num_samples)
+        if (self._amp_obs_demo is None):
+            self._build_amp_obs_demo(num_samples)
         else:
-            assert (self._amp_obs_demo_buf.shape[0] == num_samples)
+            assert (self._amp_obs_demo.shape[0] == num_samples)
 
         motion_ids = motion_load.motion_lib.sample_motions(num_samples)
         motion_times0 = motion_load.motion_lib.sample_time(motion_ids)
         amp_obs_demo = self.build_amp_obs_demo(motion_ids, motion_times0)
-        self._amp_obs_demo_buf[:] = amp_obs_demo.view(
-            self._amp_obs_demo_buf.shape)
-        amp_obs_demo_flat = self._amp_obs_demo_buf.view(
-            -1, self.get_num_amp_obs())
+        self._amp_obs_demo[:] = amp_obs_demo.view(self._amp_obs_demo.shape) # type: ignore
+        amp_obs_demo_flat = self._amp_obs_demo.view(-1, self.get_num_amp_obs()) # type: ignore
 
         return amp_obs_demo_flat
     
@@ -116,8 +117,8 @@ class AMPDemoBuffer():
 
         return amp_obs_demo
 
-    def _build_amp_obs_demo_buf(self, num_samples):
-        self._amp_obs_demo_buf = torch.zeros(
+    def _build_amp_obs_demo(self, num_samples):
+        self._amp_obs_demo = torch.zeros(
             (num_samples, self.num_amp_obs_steps, self.num_amp_obs_per_step),
             device="cuda:0",
             dtype=torch.float32)
@@ -137,12 +138,14 @@ global discriminator
 discriminator = Discriminator()
 bias_init(discriminator)
 discriminator.to("cuda:0")
-if config['training']['train']: # type: ignore
-    discriminator.train()
-else:
-    discriminator.eval()
-disc_optimizer = Adam(discriminator.parameters(), lr=2e-5)
-disc_epoches = 10
+discriminator.train()
+
+################################################################
+#################### running_mean_std ##########################
+################################################################
+global amp_input_mean_std
+amp_input_mean_std = RunningMeanStd(1950).to("cuda:0")
+amp_input_mean_std.train()
 
 ################################################################
 ########################## AMP PPO #############################
@@ -159,6 +162,9 @@ class AMPPPO(PPO):
         self.amp_replay_buffer = ReplayBuffer(amp_demo_buffer_size, "cuda:0")
 
         self._amp_replay_keep_prob = 0.01
+        self._disc_logit_reg = 0.01
+        self._disc_grad_penalty = 5
+        self._disc_weight_decay = 0.0001
 
     def _store_replay_amp_obs(self, amp_obs):
         buf_size = self.amp_replay_buffer.get_buffer_size()
@@ -291,22 +297,54 @@ class AMPPPO(PPO):
     def train(self) -> None:
         super().train()
 
-        amp_obs = self.amp_buffer
+        amp_obs = self.amp_buffer.reshape(-1, 1950)
 
         self.amp_demo_buffer.update_amp_demos()
         num_obs_samples = self.amp_buffer.shape[0] * self.amp_buffer.shape[1]
         amp_obs_demo = self.amp_demo_buffer.sample(num_obs_samples)['amp_obs']
+        amp_obs_demo.requires_grad_(True)
 
         self._store_replay_amp_obs(self.amp_buffer.reshape(-1, self.amp_buffer.shape[2]))
         amp_obs_replay = self.amp_demo_buffer.sample(num_obs_samples)['amp_obs']
 
+        disc_loss_total = torch.zeros(1).to("cuda:0").requires_grad_(False)
+        times = 0
+        for epoch in range(self.n_epochs):
+            optim_times = math.ceil(self.amp_buffer.shape[0] * self.amp_buffer.shape[1] / self.batch_size)
+            for mini_batch in range(optim_times):
+                if (mini_batch+1) * self.batch_size < self.amp_buffer.shape[0] * self.amp_buffer.shape[1]:
+                    amp_obs_batch = amp_obs[mini_batch*self.batch_size : 
+                                            (mini_batch+1)*self.batch_size]
+                    amp_obs_replay_batch = amp_obs_replay[mini_batch*self.batch_size : 
+                                                          (mini_batch+1)*self.batch_size]
+                    amp_obs_demo_batch = amp_obs_demo[mini_batch*self.batch_size : 
+                                                      (mini_batch+1)*self.batch_size]
+                else:
+                    amp_obs_batch = amp_obs[mini_batch*self.batch_size:]
+                    amp_obs_replay_batch = amp_obs_replay[mini_batch*self.batch_size:]
+                    amp_obs_demo_batch = amp_obs_demo[mini_batch*self.batch_size:]
 
-        
+                # obs normalize
+                amp_obs_batch_norm = amp_input_mean_std(amp_obs_batch).detach().clone().requires_grad_(True)
+                amp_obs_replay_batch_norm = amp_input_mean_std(amp_obs_replay_batch).detach().clone().requires_grad_(True)
+                amp_obs_demo_batch_norm = amp_input_mean_std(amp_obs_demo_batch).detach().clone().requires_grad_(True)
 
-        
-        
+                disc_agent_logit = discriminator.get_logit(amp_obs_batch_norm)
+                disc_agent_replay_logit = discriminator.get_logit(amp_obs_replay_batch_norm)
+                disc_demo_logit = discriminator.get_logit(amp_obs_demo_batch_norm)
 
+                disc_agent_cat_logit = torch.cat([disc_agent_logit, disc_agent_replay_logit], dim=0)
+                disc_loss = self._disc_loss(disc_agent_cat_logit, disc_demo_logit, amp_obs_demo_batch_norm)
+            
+                discriminator.optimizer.zero_grad()
+                disc_loss.backward()
+                discriminator.optimizer.step()
 
+                disc_loss_total += disc_loss.clone().detach()
+                times += 1
+
+        disc_loss_avg = disc_loss_total / times
+        self.logger.record("train/disc_loss", disc_loss_avg.item())
 
     def save(
         self,
@@ -316,3 +354,70 @@ class AMPPPO(PPO):
     ) -> None:
         super().save(path, exclude, include)
         torch.save(discriminator, f='logs/sb3/Isaac-AMP/discriminator.pth')
+
+
+    def _disc_loss_neg(self, disc_logits):
+        bce = torch.nn.BCEWithLogitsLoss()
+        loss = bce(disc_logits, torch.zeros_like(disc_logits))
+        return loss
+    
+    def _disc_loss_pos(self, disc_logits):
+        bce = torch.nn.BCEWithLogitsLoss()
+        loss = bce(disc_logits, torch.ones_like(disc_logits))
+        return loss
+    
+    def get_disc_weights(self, model):
+        weights = []
+        for m in model.modules():
+            if isinstance(m, nn.Linear):
+                weights.append(torch.flatten(m.weight))
+
+        return weights
+
+    def _compute_disc_acc(self, disc_agent_logit, disc_demo_logit):
+        agent_acc = disc_agent_logit < 0
+        agent_acc = torch.mean(agent_acc.float())
+        demo_acc = disc_demo_logit > 0
+        demo_acc = torch.mean(demo_acc.float())
+        return agent_acc, demo_acc
+
+    def _disc_loss(self, disc_agent_logit, disc_demo_logit, obs_demo):
+        '''
+        disc_agent_logit: replay and current episode logit (fake examples)
+        disc_demo_logit: disc_demo_logit logit 
+        obs_demo: gradient penalty demo obs (real examples)
+        '''
+        # prediction loss
+        disc_loss_agent = self._disc_loss_neg(disc_agent_logit)
+        disc_loss_demo = self._disc_loss_pos(disc_demo_logit)
+        disc_loss = 0.5 * (disc_loss_agent + disc_loss_demo)
+
+        # logit reg
+        logit_weights = torch.flatten(discriminator.disc_logit.weight)
+        disc_logit_loss = torch.sum(torch.square(logit_weights))
+        disc_loss += self._disc_logit_reg * disc_logit_loss
+
+        # grad penalty
+        disc_demo_grad = torch.autograd.grad(
+            disc_demo_logit,
+            obs_demo,
+            grad_outputs=torch.ones_like(disc_demo_logit),
+            create_graph=True,
+            retain_graph=True,
+            only_inputs=True)
+        disc_demo_grad = disc_demo_grad[0]
+
+        disc_demo_grad = torch.sum(torch.square(disc_demo_grad), dim=-1)
+
+        disc_grad_penalty = torch.mean(disc_demo_grad)
+        disc_loss += self._disc_grad_penalty * disc_grad_penalty
+
+        # weight decay
+        if (self._disc_weight_decay != 0):
+            disc_weights = self.get_disc_weights(discriminator.disc_mlp)
+            disc_weights.append(logit_weights)
+            disc_weights = torch.cat(disc_weights, dim=-1)
+            disc_weight_decay = torch.sum(torch.square(disc_weights))
+            disc_loss += self._disc_weight_decay * disc_weight_decay
+
+        return disc_loss

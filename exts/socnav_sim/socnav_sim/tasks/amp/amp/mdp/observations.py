@@ -72,7 +72,7 @@ class ObsComputer():
 
     def compute_humanoid_obs(self, 
                              env: ManagerBasedEnv, 
-                             asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+                             asset_cfg: SceneEntityCfg = SceneEntityCfg("robot") # type: ignore
                         ) -> torch.Tensor:
         asset: Articulation = env.scene[asset_cfg.name]
 
@@ -135,7 +135,8 @@ class ObsComputer():
                                       self.hist_amp_obs_buf), dim=1)
         self.hist_amp_obs_buf = self.amp_obs_buf[:, 0:9]
         # calculate amp reward
-        amp_reward = policy.discriminator(self.amp_obs_buf.reshape(num_envs, -1)).squeeze(1)
+        norm_amp_obs = policy.amp_input_mean_std(self.amp_obs_buf.reshape(num_envs, -1))
+        amp_reward = policy.discriminator(norm_amp_obs).squeeze(1)
         reward = amp_reward.clone().detach()
 
         # record amp_replay_obs
