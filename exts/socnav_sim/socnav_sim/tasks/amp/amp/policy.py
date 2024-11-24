@@ -1,3 +1,4 @@
+import gc
 import torch
 import torch.nn as nn
 from torch.optim import Adam
@@ -302,7 +303,6 @@ class AMPPPO(PPO):
         self.amp_demo_buffer.update_amp_demos()
         num_obs_samples = self.amp_buffer.shape[0] * self.amp_buffer.shape[1]
         amp_obs_demo = self.amp_demo_buffer.sample(num_obs_samples)['amp_obs']
-        amp_obs_demo.requires_grad_(True)
 
         self._store_replay_amp_obs(self.amp_buffer.reshape(-1, self.amp_buffer.shape[2]))
         amp_obs_replay = self.amp_demo_buffer.sample(num_obs_samples)['amp_obs']
@@ -325,9 +325,9 @@ class AMPPPO(PPO):
                     amp_obs_demo_batch = amp_obs_demo[mini_batch*self.batch_size:]
 
                 # obs normalize
-                amp_obs_batch_norm = amp_input_mean_std(amp_obs_batch).detach().clone().requires_grad_(True)
-                amp_obs_replay_batch_norm = amp_input_mean_std(amp_obs_replay_batch).detach().clone().requires_grad_(True)
-                amp_obs_demo_batch_norm = amp_input_mean_std(amp_obs_demo_batch).detach().clone().requires_grad_(True)
+                amp_obs_batch_norm = amp_input_mean_std(amp_obs_batch).detach()
+                amp_obs_replay_batch_norm = amp_input_mean_std(amp_obs_replay_batch).detach()
+                amp_obs_demo_batch_norm = amp_input_mean_std(amp_obs_demo_batch).detach().requires_grad_(True)
 
                 disc_agent_logit = discriminator.get_logit(amp_obs_batch_norm)
                 disc_agent_replay_logit = discriminator.get_logit(amp_obs_replay_batch_norm)
@@ -337,12 +337,15 @@ class AMPPPO(PPO):
                 disc_loss = self._disc_loss(disc_agent_cat_logit, disc_demo_logit, amp_obs_demo_batch_norm)
             
                 discriminator.optimizer.zero_grad()
-                disc_loss.backward()
+                disc_loss.backward(retain_graph=False)
                 discriminator.optimizer.step()
 
-                disc_loss_total += disc_loss.clone().detach()
+                disc_loss_total += disc_loss.detach()
                 times += 1
 
+        del amp_obs, amp_obs_replay, amp_obs_demo
+        torch.cuda.empty_cache()
+        gc.collect()
         disc_loss_avg = disc_loss_total / times
         self.logger.record("train/disc_loss", disc_loss_avg.item())
 
