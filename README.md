@@ -64,3 +64,6 @@ If everything executes correctly, it should create a file .python.env in the `.v
 
 ### Training scene
 ![training for pacer](./assets/training_for_pacer "training for pace")
+
+### Inference phase
+./isaaclab.sh -p -m tensorboard.main --logdir logs/sb3/task...
