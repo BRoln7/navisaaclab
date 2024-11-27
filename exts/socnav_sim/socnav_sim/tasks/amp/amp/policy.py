@@ -1,12 +1,12 @@
 import gc
 import torch
 import torch.nn as nn
-from torch.optim import Adam
+from torch.nn import functional as F
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.buffers import RolloutBuffer
-from stable_baselines3.common.utils import obs_as_tensor
+from stable_baselines3.common.utils import obs_as_tensor, explained_variance
 import numpy as np
 import math
 import random
@@ -44,6 +44,8 @@ with open(motion_file, 'r') as file:
 num_envs = config['env']['num_envs'] # type: ignore
 global motion_load
 motion_load = MotionLoad(num_envs)
+
+disc_coef = config['training']['disc_coef'] # type: ignore
 
 ###################################################
 ################# demo buffer #####################
@@ -94,7 +96,7 @@ class AMPDemoBuffer():
     
     def build_amp_obs_demo(self, motion_ids, motion_times0):
         # Compute observation for the motion starting point
-        dt = 1 / 120
+        dt = 1 / 30
         motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, self.num_amp_obs_steps])
 
         motion_times = motion_times0.unsqueeze(-1)
@@ -166,6 +168,7 @@ class AMPPPO(PPO):
         self._disc_logit_reg = 0.01
         self._disc_grad_penalty = 5
         self._disc_weight_decay = 0.0001
+        self.bounds_loss_coef = 10
 
     def _store_replay_amp_obs(self, amp_obs):
         buf_size = self.amp_replay_buffer.get_buffer_size()
@@ -195,12 +198,10 @@ class AMPPPO(PPO):
         obs = importlib.import_module("socnav_sim.tasks.amp.amp.mdp.observations")
 
         assert self._last_obs is not None, "No previous observation was provided"
-        # Switch to eval mode (this affects batch norm / dropout)
         self.policy.set_training_mode(False)
 
         n_steps = 0
         rollout_buffer.reset()
-        # Sample new weights for the state dependent exploration
         if self.use_sde:
             self.policy.reset_noise(env.num_envs)
 
@@ -211,33 +212,25 @@ class AMPPPO(PPO):
 
         while n_steps < n_rollout_steps:
             if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
-                # Sample a new noise matrix
                 self.policy.reset_noise(env.num_envs)
 
             with torch.no_grad():
-                # Convert to pytorch tensor or to TensorDict
                 obs_tensor = obs_as_tensor(self._last_obs, self.device)
                 actions, values, log_probs = self.policy(obs_tensor)
             actions = actions.cpu().numpy()
 
-            # Rescale and perform action
             clipped_actions = actions
 
             if isinstance(self.action_space, spaces.Box):
                 if self.policy.squash_output:
-                    # Unscale the actions to match env bounds
-                    # if they were previously squashed (scaled in [-1, 1])
                     clipped_actions = self.policy.unscale_action(clipped_actions)
                 else:
-                    # Otherwise, clip the actions to avoid out of bound error
-                    # as we are sampling from an unbounded Gaussian distribution
                     clipped_actions = np.clip(actions, self.action_space.low, self.action_space.high)
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
             self.num_timesteps += env.num_envs
 
-            # Give access to local variables
             callback.update_locals(locals())
             if not callback.on_step():
                 return False
@@ -246,11 +239,8 @@ class AMPPPO(PPO):
             n_steps += 1
 
             if isinstance(self.action_space, spaces.Discrete):
-                # Reshape in case of discrete action
                 actions = actions.reshape(-1, 1)
 
-            # Handle timeout by bootstraping with value function
-            # see GitHub issue #633
             for idx, done in enumerate(dones):
                 if (
                     done
@@ -283,7 +273,6 @@ class AMPPPO(PPO):
 
 
         with torch.no_grad():
-            # Compute value for the last timestep
             values = self.policy.predict_values(obs_as_tensor(new_obs, self.device))  # type: ignore[arg-type]
 
         rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
@@ -296,16 +285,121 @@ class AMPPPO(PPO):
 
 
     def train(self) -> None:
-        super().train()
 
+        self.policy.set_training_mode(True)
+        self._update_learning_rate(self.policy.optimizer)
+        clip_range = self.clip_range(self._current_progress_remaining)  # type: ignore[operator]
+        if self.clip_range_vf is not None:
+            clip_range_vf = self.clip_range_vf(self._current_progress_remaining)  # type: ignore[operator]
+
+        entropy_losses = []
+        pg_losses, value_losses = [], []
+        clip_fractions = []
+
+        continue_training = True
+        for epoch in range(self.n_epochs):
+            approx_kl_divs = []
+            for rollout_data in self.rollout_buffer.get(self.batch_size):
+                actions = rollout_data.actions
+                if isinstance(self.action_space, spaces.Discrete):
+                    actions = rollout_data.actions.long().flatten()
+
+                if self.use_sde:
+                    self.policy.reset_noise(self.batch_size)
+
+                values, log_prob, entropy = self.policy.evaluate_actions(rollout_data.observations, actions)
+                values = values.flatten()
+                advantages = rollout_data.advantages
+                if self.normalize_advantage and len(advantages) > 1:
+                    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+                ratio = torch.exp(log_prob - rollout_data.old_log_prob)
+
+                policy_loss_1 = advantages * ratio
+                policy_loss_2 = advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
+                policy_loss = -torch.min(policy_loss_1, policy_loss_2).mean()
+
+                # Logging
+                pg_losses.append(policy_loss.item())
+                clip_fraction = torch.mean((torch.abs(ratio - 1) > clip_range).float()).item()
+                clip_fractions.append(clip_fraction)
+
+                if self.clip_range_vf is None:
+                    values_pred = values
+                else:
+                    # NOTE: this depends on the reward scaling
+                    values_pred = rollout_data.old_values + torch.clamp(
+                        values - rollout_data.old_values, -clip_range_vf, clip_range_vf # type: ignore
+                    )
+                value_loss = F.mse_loss(rollout_data.returns, values_pred)
+                value_losses.append(value_loss.item())
+
+                if entropy is None:
+                    entropy_loss = -torch.mean(-log_prob)
+                else:
+                    entropy_loss = -torch.mean(entropy)
+
+                entropy_losses.append(entropy_loss.item())
+
+                ########################### add bound loss here #############################
+                mus = self.policy(rollout_data.observations, deterministic=True)
+                b_loss = torch.mean(self.bound_loss(mus[0]))
+                ########################### sum all the loss ################################
+                loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss \
+                    + self.bounds_loss_coef * b_loss
+
+                with torch.no_grad():
+                    log_ratio = log_prob - rollout_data.old_log_prob
+                    approx_kl_div = torch.mean((torch.exp(log_ratio) - 1) - log_ratio).cpu().numpy()
+                    approx_kl_divs.append(approx_kl_div)
+
+                if self.target_kl is not None and approx_kl_div > 1.5 * self.target_kl:
+                    continue_training = False
+                    if self.verbose >= 1:
+                        print(f"Early stopping at step {epoch} due to reaching max kl: {approx_kl_div:.2f}")
+                    break
+                
+                self.policy.optimizer.zero_grad()
+                loss.backward(retain_graph=False)
+                torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+                self.policy.optimizer.step()
+
+            self._n_updates += 1
+            if not continue_training:
+                break
+
+        explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
+
+        # Logs
+        self.logger.record("train/entropy_loss", np.mean(entropy_losses))
+        self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
+        self.logger.record("train/value_loss", np.mean(value_losses))
+        self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
+        self.logger.record("train/clip_fraction", np.mean(clip_fractions))
+        self.logger.record("train/loss", loss.item())
+        self.logger.record("train/explained_variance", explained_var)
+        if hasattr(self.policy, "log_std"):
+            self.logger.record("train/std", torch.exp(self.policy.log_std).mean().item())
+        self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
+        self.logger.record("train/clip_range", clip_range)
+        if self.clip_range_vf is not None:
+            self.logger.record("train/clip_range_vf", clip_range_vf)
+
+
+        ##################################################################
+        ######################## from here amp ###########################
+        ##################################################################
         amp_obs = self.amp_buffer.reshape(-1, 1950)
+        amp_obs = amp_input_mean_std(amp_obs)
 
-        self.amp_demo_buffer.update_amp_demos()
         num_obs_samples = self.amp_buffer.shape[0] * self.amp_buffer.shape[1]
-        amp_obs_demo = self.amp_demo_buffer.sample(num_obs_samples)['amp_obs']
-
         self._store_replay_amp_obs(self.amp_buffer.reshape(-1, self.amp_buffer.shape[2]))
         amp_obs_replay = self.amp_demo_buffer.sample(num_obs_samples)['amp_obs']
+        amp_obs_replay = amp_input_mean_std(amp_obs_replay)
+
+        self.amp_demo_buffer.update_amp_demos()
+        amp_obs_demo = self.amp_demo_buffer.sample(num_obs_samples)['amp_obs']
+        amp_obs_demo = amp_input_mean_std(amp_obs_demo)
 
         disc_loss_total = torch.zeros(1).to("cuda:0").requires_grad_(False)
         times = 0
@@ -324,18 +418,15 @@ class AMPPPO(PPO):
                     amp_obs_replay_batch = amp_obs_replay[mini_batch*self.batch_size:]
                     amp_obs_demo_batch = amp_obs_demo[mini_batch*self.batch_size:]
 
-                # obs normalize
-                amp_obs_batch_norm = amp_input_mean_std(amp_obs_batch).detach()
-                amp_obs_replay_batch_norm = amp_input_mean_std(amp_obs_replay_batch).detach()
-                amp_obs_demo_batch_norm = amp_input_mean_std(amp_obs_demo_batch).detach().requires_grad_(True)
-
-                disc_agent_logit = discriminator.get_logit(amp_obs_batch_norm)
-                disc_agent_replay_logit = discriminator.get_logit(amp_obs_replay_batch_norm)
-                disc_demo_logit = discriminator.get_logit(amp_obs_demo_batch_norm)
+                amp_obs_demo_batch.requires_grad_(True)
+                disc_agent_logit = discriminator.get_logit(amp_obs_batch)
+                disc_agent_replay_logit = discriminator.get_logit(amp_obs_replay_batch)
+                disc_demo_logit = discriminator.get_logit(amp_obs_demo_batch)
 
                 disc_agent_cat_logit = torch.cat([disc_agent_logit, disc_agent_replay_logit], dim=0)
-                disc_loss = self._disc_loss(disc_agent_cat_logit, disc_demo_logit, amp_obs_demo_batch_norm)
-            
+                disc_loss = self._disc_loss(disc_agent_cat_logit, disc_demo_logit, amp_obs_demo_batch)
+                disc_loss =  disc_coef * disc_loss
+
                 discriminator.optimizer.zero_grad()
                 disc_loss.backward(retain_graph=False)
                 discriminator.optimizer.step()
@@ -357,6 +448,7 @@ class AMPPPO(PPO):
     ) -> None:
         super().save(path, exclude, include)
         torch.save(discriminator, f='logs/sb3/Isaac-AMP/discriminator.pth')
+        torch.save(amp_input_mean_std, f='logs/sb3/Isaac-AMP/amp_input_mean_std.pth')
 
 
     def _disc_loss_neg(self, disc_logits):
@@ -424,3 +516,11 @@ class AMPPPO(PPO):
             disc_loss += self._disc_weight_decay * disc_weight_decay
 
         return disc_loss
+
+    def bound_loss(self, mu):
+        soft_bound = 1.0
+        mu_loss_high = torch.maximum(mu - soft_bound, torch.tensor(0, device="cuda:0"))**2
+        mu_loss_low = torch.minimum(mu + soft_bound, torch.tensor(0, device="cuda:0"))**2
+        b_loss = (mu_loss_low + mu_loss_high).sum(axis=-1) # type: ignore
+
+        return b_loss

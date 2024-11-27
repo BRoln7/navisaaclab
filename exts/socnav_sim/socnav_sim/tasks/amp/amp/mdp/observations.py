@@ -146,7 +146,7 @@ class ObsComputer():
         return reward
         
     def reset_amp_obs(self, env_ids, motion_ids, motion_times):
-        dt = 1 / 120
+        dt = 1 / 30
 
         motion_ids = motion_ids[env_ids]
         motion_times = motion_times[env_ids]

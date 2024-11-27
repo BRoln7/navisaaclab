@@ -30,7 +30,6 @@ import os
 from datetime import datetime
 import torch
 
-from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.vec_env import VecNormalize
@@ -112,7 +111,7 @@ def main():
     agent.set_logger(new_logger)
     print("[INFO]:agents loaded")
 
-    checkpoint_callback = CheckpointCallback(save_freq=5000, save_path=log_dir, name_prefix="model", verbose=2)
+    checkpoint_callback = CheckpointCallback(save_freq=10000, save_path=log_dir, name_prefix="model", verbose=2)
     agent.learn(total_timesteps=n_timesteps, callback=checkpoint_callback)
     agent.save(os.path.join(log_dir, "model"))
 

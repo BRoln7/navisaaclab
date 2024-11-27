@@ -1,16 +1,21 @@
 import torch
 import os
+import yaml
 import numpy as np
 from socnav_sim.tasks.amp.amp_utils.isaac_utils.flags import flags
 from socnav_sim.tasks.amp.amp_utils.utils.motion_lib_smpl import MotionLib as MotionLibSMPL
 from poselib.skeleton.skeleton3d import SkeletonTree
 from socnav_sim.uhc.smpllib.smpl_parser import SMPL_Parser
 
+motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'amp.yaml')
+with open(motion_file, 'r') as file:
+    config = yaml.safe_load(file)
+
 class MotionLoad():
     def __init__(self, num_envs):
     
         self.key_body_ids = np.array([8, 7, 21, 20])
-        motion_file = os.path.join(os.getcwd(), 'data', 'amass_isaac_run_upright_slim.pkl')
+        motion_file = os.path.join(os.getcwd(), 'data', config['training']['data_file']) # type: ignore
         self.motion_lib = MotionLibSMPL(
             motion_file=motion_file,
             key_body_ids=self.key_body_ids,
