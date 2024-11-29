@@ -62,21 +62,21 @@ def reset_init_state(asset:Articulation):
     wxyz_to_xyzw = [3, 0, 1, 2]
     motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, \
       root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = motion_load.sample_ref_state(1)
-    asset.write_root_pose_to_sim(torch.cat([root_pos, root_rot[:, wxyz_to_xyzw]], dim=-1)) # type: ignore
-    asset.write_root_velocity_to_sim(torch.cat([root_vel, root_ang_vel], dim=-1)) # type: ignore
+    asset.write_root_pose_to_sim(torch.cat([root_pos, root_rot[:, wxyz_to_xyzw]], dim=-1))
+    asset.write_root_velocity_to_sim(torch.cat([root_vel, root_ang_vel], dim=-1))
     asset.write_joint_state_to_sim(position=dof_pos[:,dof_gym_to_sim],\
-                                    velocity=dof_vel[:,dof_gym_to_sim]) # type: ignore
+                                    velocity=dof_vel[:,dof_gym_to_sim])
     
     return motion_ids, motion_times
 
 
 def reset_amp_motion(motion_ids, motion_times):
-    dt = 1 / 120
+    dt = 1 / 30
 
-    motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, 900])
+    motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, 300])
     motion_times = motion_times.unsqueeze(-1)
 
-    time_steps = dt * (torch.arange(0, 900, device='cuda:0') + 1)
+    time_steps = dt * (torch.arange(0, 300, device='cuda:0') + 1)
     motion_times = motion_times + time_steps
 
     motion_ids = motion_ids.view(-1)

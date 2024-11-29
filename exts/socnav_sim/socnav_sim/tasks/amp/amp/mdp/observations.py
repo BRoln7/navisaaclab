@@ -15,7 +15,7 @@ from omni.isaac.lab.managers import SceneEntityCfg
 from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
     compute_humanoid_observations_smpl_max,
     rot_wxyz_to_xyzw,
-    key_body_names,
+    root_wxyz_to_xyzw,
     build_amp_observations_smpl,
     dof_sim_to_gym,
     body_sim_to_gym,
@@ -45,25 +45,13 @@ if TYPE_CHECKING:
 #########################################################################################
 class ObsComputer():
     def __init__(self) -> None:
-        self._speed_min = 0.0
-        self._speed_max = 3.0
-        self._accel_max = 2.0
-        self._sharp_turn_prob = 0.02
-        self._num_traj_samples = 10
-        self._traj_sample_timestep = 0.5
-        self._traj_gen_init = False
-        self._traj_gen = None
         self._has_upright_start = True
-        self.height_meas_scale = 5
-        self.num_height_points = 1024
-        self.num_center_height_points = 9
         self._local_root_obs = True
         self._amp_root_height_obs = False
         self._has_dof_subset = True
         self._has_shape_obs_disc = False
         self.dof_subset = dof_subset
 
-        self.amp_init_flag = False
         self.amp_obs_buf = torch.zeros(
             (num_envs, 10, amp_obs_shape_step), device="cuda:0", dtype=torch.float)
         self.curr_amp_obs_buf = self.amp_obs_buf[:, 0]
@@ -97,16 +85,14 @@ class ObsComputer():
                         ) -> torch.Tensor:
         # calculate current amp observation
         asset: Articulation = env.scene[asset_cfg.name]
-
-        key_body_ids = asset.find_bodies(key_body_names)
+        # ankles, wrists
         key_body_ids = [8, 7, 21, 20]
         key_body_pos = asset.data.body_pos_w[:, key_body_ids]
-        
-        spine_id = asset.find_bodies("Spine")
-        spine_body_pos = asset.data.body_pos_w[:, spine_id[0], :].squeeze(1)
-        spine_body_rot = rot_wxyz_to_xyzw(asset.data.body_quat_w[:, spine_id[0], :]).squeeze(1)
-        spine_body_vel = asset.data.body_lin_vel_w[:, spine_id[0], :].squeeze(1)
-        spine_body_ang_vel = asset.data.body_ang_vel_w[:, spine_id[0], :].squeeze(1)
+        # root pos
+        spine_body_pos = asset.data.root_pos_w
+        spine_body_rot = root_wxyz_to_xyzw(asset.data.root_quat_w).squeeze(1)
+        spine_body_vel = asset.data.root_lin_vel_w.squeeze(1)
+        spine_body_ang_vel = asset.data.root_ang_vel_w.squeeze(1)
 
         joint_pos = asset.data.joint_pos[:, dof_sim_to_gym]
         joint_vel = asset.data.joint_vel[:, dof_sim_to_gym]
@@ -118,22 +104,18 @@ class ObsComputer():
             self.dof_subset, 
             self._local_root_obs, self._amp_root_height_obs, self._has_dof_subset, self._has_upright_start)
 
-        # init history amp observation
-        if self.amp_init_flag == False:
-            self.amp_init_flag = True
-            self.reset_amp_obs(torch.arange(0, env.num_envs, 1),
+        # events reset
+        if events.amp_obs_reset is True:
+            self.reset_amp_obs(events.amp_reset_env_ids,
                                events.amp_motion_ids,
                                events.amp_motion_times)
+            events.amp_obs_reset = False
+            
         # update history amp observation
-        # reset
-        if reset.fall_reset_env_ids.numel() != 0:
-            self.reset_amp_obs(reset.fall_reset_env_ids, events.amp_motion_ids, events.amp_motion_times)
-        if reset.time_out_env_ids.numel() != 0:
-            self.reset_amp_obs(reset.time_out_env_ids, events.amp_motion_ids, events.amp_motion_times)
-
         self.amp_obs_buf = torch.cat((curr_amp_obs.reshape(env.num_envs, 1, -1), 
                                       self.hist_amp_obs_buf), dim=1)
         self.hist_amp_obs_buf = self.amp_obs_buf[:, 0:9]
+
         # calculate amp reward
         norm_amp_obs = policy.amp_input_mean_std(self.amp_obs_buf.reshape(num_envs, -1))
         amp_reward = policy.discriminator(norm_amp_obs).squeeze(1)

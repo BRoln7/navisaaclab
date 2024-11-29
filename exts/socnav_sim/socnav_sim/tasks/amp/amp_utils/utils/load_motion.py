@@ -14,7 +14,7 @@ with open(motion_file, 'r') as file:
 class MotionLoad():
     def __init__(self, num_envs):
     
-        self.key_body_ids = np.array([8, 7, 21, 20])
+        self.key_body_ids = np.array([7, 3, 22, 17])
         motion_file = os.path.join(os.getcwd(), 'data', config['training']['data_file']) # type: ignore
         self.motion_lib = MotionLibSMPL(
             motion_file=motion_file,

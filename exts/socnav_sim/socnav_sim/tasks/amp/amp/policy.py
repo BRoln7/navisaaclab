@@ -4,10 +4,12 @@ import torch.nn as nn
 from torch.nn import functional as F
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecEnv
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.utils import obs_as_tensor, explained_variance
 import numpy as np
+import gymnasium as gym
 import math
 import random
 import os
@@ -22,6 +24,7 @@ from socnav_sim.tasks.amp.amp_utils.utils.load_motion import MotionLoad
 from socnav_sim.tasks.amp.amp_utils.utils.discriminator import Discriminator, bias_init
 from socnav_sim.tasks.amp.amp_utils.isaac_utils.gym_utils import to_torch
 from socnav_sim.tasks.amp.amp_utils.utils.running_mean_std import RunningMeanStd
+from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import dof_gym_to_sim
 import importlib
 
 obs_shape = 357
@@ -46,6 +49,28 @@ global motion_load
 motion_load = MotionLoad(num_envs)
 
 disc_coef = config['training']['disc_coef'] # type: ignore
+
+###################################################
+################## preprocess #####################
+###################################################
+class PreProcess(BaseFeaturesExtractor):
+    def __init__(self, observation_space: gym.spaces.Box, features_dim:int = 357):
+      super(PreProcess, self).__init__(observation_space, features_dim)
+      self.task_mlp = nn.Sequential(
+          nn.Linear(1044, 512),
+          nn.ReLU(),
+          nn.Linear(512, 256),
+          nn.ReLU())
+      self.running_mean_std = RunningMeanStd(obs_shape).to("cuda:0")
+      if config['training']['train']: # type: ignore
+          self.running_mean_std.train()
+      else:
+          self.running_mean_std.eval()
+
+    def forward(self, obs):
+      obs_norm = self.running_mean_std(obs)
+      assert(obs_norm.size(1) == self.features_dim)
+      return obs_norm
 
 ###################################################
 ################# demo buffer #####################
@@ -112,7 +137,6 @@ class AMPDemoBuffer():
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, smpl_params, limb_weights, pose_aa, rb_pos, rb_rot, body_vel, body_ang_vel = \
             motion_res["root_pos"], motion_res["root_rot"], motion_res["dof_pos"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_vel"], \
             motion_res["key_pos"], motion_res["motion_bodies"], motion_res["motion_limb_weights"], motion_res["motion_aa"], motion_res["rg_pos"], motion_res["rb_rot"], motion_res["body_vel"], motion_res["body_ang_vel"]
-
         amp_obs_demo = build_amp_observations_smpl(
             root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel,
             key_pos, dof_subset, self._local_root_obs,
@@ -143,13 +167,9 @@ bias_init(discriminator)
 discriminator.to("cuda:0")
 discriminator.train()
 
-################################################################
-#################### running_mean_std ##########################
-################################################################
 global amp_input_mean_std
 amp_input_mean_std = RunningMeanStd(1950).to("cuda:0")
 amp_input_mean_std.train()
-
 ################################################################
 ########################## AMP PPO #############################
 ################################################################
@@ -271,7 +291,6 @@ class AMPPPO(PPO):
             else:
                 self.amp_buffer = torch.cat((self.amp_buffer, obs.amp_replay_obs), dim=0)
 
-
         with torch.no_grad():
             values = self.policy.predict_values(obs_as_tensor(new_obs, self.device))  # type: ignore[arg-type]
 
@@ -283,109 +302,9 @@ class AMPPPO(PPO):
 
         return True
 
-
     def train(self) -> None:
-
-        self.policy.set_training_mode(True)
-        self._update_learning_rate(self.policy.optimizer)
-        clip_range = self.clip_range(self._current_progress_remaining)  # type: ignore[operator]
-        if self.clip_range_vf is not None:
-            clip_range_vf = self.clip_range_vf(self._current_progress_remaining)  # type: ignore[operator]
-
-        entropy_losses = []
-        pg_losses, value_losses = [], []
-        clip_fractions = []
-
-        continue_training = True
-        for epoch in range(self.n_epochs):
-            approx_kl_divs = []
-            for rollout_data in self.rollout_buffer.get(self.batch_size):
-                actions = rollout_data.actions
-                if isinstance(self.action_space, spaces.Discrete):
-                    actions = rollout_data.actions.long().flatten()
-
-                if self.use_sde:
-                    self.policy.reset_noise(self.batch_size)
-
-                values, log_prob, entropy = self.policy.evaluate_actions(rollout_data.observations, actions)
-                values = values.flatten()
-                advantages = rollout_data.advantages
-                if self.normalize_advantage and len(advantages) > 1:
-                    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-
-                ratio = torch.exp(log_prob - rollout_data.old_log_prob)
-
-                policy_loss_1 = advantages * ratio
-                policy_loss_2 = advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
-                policy_loss = -torch.min(policy_loss_1, policy_loss_2).mean()
-
-                # Logging
-                pg_losses.append(policy_loss.item())
-                clip_fraction = torch.mean((torch.abs(ratio - 1) > clip_range).float()).item()
-                clip_fractions.append(clip_fraction)
-
-                if self.clip_range_vf is None:
-                    values_pred = values
-                else:
-                    # NOTE: this depends on the reward scaling
-                    values_pred = rollout_data.old_values + torch.clamp(
-                        values - rollout_data.old_values, -clip_range_vf, clip_range_vf # type: ignore
-                    )
-                value_loss = F.mse_loss(rollout_data.returns, values_pred)
-                value_losses.append(value_loss.item())
-
-                if entropy is None:
-                    entropy_loss = -torch.mean(-log_prob)
-                else:
-                    entropy_loss = -torch.mean(entropy)
-
-                entropy_losses.append(entropy_loss.item())
-
-                ########################### add bound loss here #############################
-                mus = self.policy(rollout_data.observations, deterministic=True)
-                b_loss = torch.mean(self.bound_loss(mus[0]))
-                ########################### sum all the loss ################################
-                loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss \
-                    + self.bounds_loss_coef * b_loss
-
-                with torch.no_grad():
-                    log_ratio = log_prob - rollout_data.old_log_prob
-                    approx_kl_div = torch.mean((torch.exp(log_ratio) - 1) - log_ratio).cpu().numpy()
-                    approx_kl_divs.append(approx_kl_div)
-
-                if self.target_kl is not None and approx_kl_div > 1.5 * self.target_kl:
-                    continue_training = False
-                    if self.verbose >= 1:
-                        print(f"Early stopping at step {epoch} due to reaching max kl: {approx_kl_div:.2f}")
-                    break
-                
-                self.policy.optimizer.zero_grad()
-                loss.backward(retain_graph=False)
-                torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
-                self.policy.optimizer.step()
-
-            self._n_updates += 1
-            if not continue_training:
-                break
-
-        explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
-
-        # Logs
-        self.logger.record("train/entropy_loss", np.mean(entropy_losses))
-        self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
-        self.logger.record("train/value_loss", np.mean(value_losses))
-        self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
-        self.logger.record("train/clip_fraction", np.mean(clip_fractions))
-        self.logger.record("train/loss", loss.item())
-        self.logger.record("train/explained_variance", explained_var)
-        if hasattr(self.policy, "log_std"):
-            self.logger.record("train/std", torch.exp(self.policy.log_std).mean().item())
-        self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
-        self.logger.record("train/clip_range", clip_range)
-        if self.clip_range_vf is not None:
-            self.logger.record("train/clip_range_vf", clip_range_vf)
-
-
+        super().train()
+        
         ##################################################################
         ######################## from here amp ###########################
         ##################################################################

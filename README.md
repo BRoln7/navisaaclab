@@ -65,5 +65,15 @@ If everything executes correctly, it should create a file .python.env in the `.v
 ### Training scene
 ![training for pacer](./assets/training_for_pacer "training for pace")
 
+### motion visualization
+
+##### amass walk motion
+![amass walk motion](./assets/amass_motion_walk.gif "amass walk motion")
+
+##### Hold the wall while walking
+![Hold the wall while walking](./assets/amass_motion_visual.gif "Hold the wall while walking")
+
+
+
 ### Inference phase
 ./isaaclab.sh -p -m tensorboard.main --logdir logs/sb3/task...

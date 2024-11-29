@@ -1,6 +1,7 @@
 import torch
 from socnav_sim.tasks.amp.amp_utils.isaac_utils import torch_utils, gym_utils
 
+# without hands and toes
 dof_subset = torch.tensor([ 
     0,  1,  2,  3,  4,  5,  6,  7,  8, 12, 
     13, 14, 15, 16, 17, 18, 19, 20, 24, 25, 
@@ -76,16 +77,17 @@ sim_rigid_body_dict = {'Pelvis': 0, 'L_Hip': 1, 'R_Hip': 2, 'Torso': 3, 'L_Knee'
                        'R_Thorax': 14, 'Head': 15, 'L_Shoulder': 16, 'R_Shoulder': 17, 'L_Elbow': 18, 'R_Elbow': 19, 
                        'L_Wrist': 20, 'R_Wrist': 21, 'L_Hand': 22, 'R_Hand': 23}
 
-dof_sim_to_gym = [0, 1, 2, 12, 13, 14, 24, 25, 26, 3, 4, 5, 15, 16, 17, 27, 28, 29, 
+dof_gym_to_sim = [0, 1, 2, 12, 13, 14, 24, 25, 26, 3, 4, 5, 15, 16, 17, 27, 28, 29, 
                   6, 7, 8, 18, 19, 20, 30, 31, 32, 9, 10, 11, 21, 22, 23, 33, 34, 35, 
                   39, 40, 41, 54, 55, 56, 36, 37, 38, 42, 43, 44, 57, 58, 59, 45, 46, 
                   47, 60, 61, 62, 48, 49, 50, 63, 64, 65, 51, 52, 53, 66, 67, 68]
-body_sim_to_gym = [0, 1, 5, 9, 2, 6, 10, 3, 7, 11, 4, 8, 12, 14, 19, 13, 15, 20, 16, 21, 17, 22, 18, 23]
-dof_gym_to_sim = [0, 1, 2, 9, 10, 11, 18, 19, 20, 27, 28, 29, 3, 4, 5, 12, 13, 14, 
+body_gym_to_sim = [0, 1, 5, 9, 2, 6, 10, 3, 7, 11, 4, 8, 12, 14, 19, 13, 15, 20, 16, 21, 17, 22, 18, 23]
+
+dof_sim_to_gym = [0, 1, 2, 9, 10, 11, 18, 19, 20, 27, 28, 29, 3, 4, 5, 12, 13, 14, 
                   21, 22, 23, 30, 31, 32, 6, 7, 8, 15, 16, 17, 24, 25, 26, 33, 34, 
                   35, 42, 43, 44, 36, 37, 38, 45, 46, 47, 51, 52, 53, 57, 58, 59, 
                   63, 64, 65, 39, 40, 41, 48, 49, 50, 54, 55, 56, 60, 61, 62, 66, 67, 68]
-body_gym_to_sim = [0, 1, 4, 7, 10, 2, 5, 8, 11, 3, 6, 9, 12, 15, 13, 16, 18, 20, 22, 14, 17, 19, 21, 23]
+body_sim_to_gym = [0, 1, 4, 7, 10, 2, 5, 8, 11, 3, 6, 9, 12, 15, 13, 16, 18, 20, 22, 14, 17, 19, 21, 23]
 
 @torch.jit.script
 def rot_wxyz_to_xyzw(rot_obs):
@@ -93,6 +95,11 @@ def rot_wxyz_to_xyzw(rot_obs):
     rot_obs[:, :, wxyz_to_xyzw] = rot_obs.clone()
     return rot_obs
 
+@torch.jit.script
+def root_wxyz_to_xyzw(rot_obs):
+    wxyz_to_xyzw = [3, 0, 1, 2]
+    rot_obs[:, wxyz_to_xyzw] = rot_obs.clone()
+    return rot_obs
 
 @torch.jit.script
 def root_states_wxyz_to_xyzw(rot_obs):

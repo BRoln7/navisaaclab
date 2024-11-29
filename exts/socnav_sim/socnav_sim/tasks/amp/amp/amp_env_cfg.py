@@ -98,7 +98,6 @@ class EventCfg:
     reset_base = EventTerm(
         func=mdp.reset_init_state_amp_motion,
         mode="reset",
-        params={"pose_range": {}, "velocity_range": {}},
     )
 
 

@@ -32,7 +32,6 @@ import torch
 
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.logger import configure
-from stable_baselines3.common.vec_env import VecNormalize
 
 from omni.isaac.lab.utils.dict import print_dict
 from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
@@ -42,7 +41,7 @@ import numpy as np
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg, get_checkpoint_path
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 import socnav_sim.tasks
-from socnav_sim.tasks.amp.amp.policy import AMPPPO
+from socnav_sim.tasks.amp.amp.policy import AMPPPO, PreProcess
 from socnav_sim.tasks.amp.amp_utils.utils.discriminator import bias_init
 import os
 
@@ -75,16 +74,6 @@ def main():
     env = Sb3VecEnvWrapper(env) # type: ignore
     env.seed(seed=agent_cfg["seed"])
 
-    env = VecNormalize(
-        env,
-        training=True,
-        norm_obs=True,
-        norm_reward=False,
-        clip_obs=np.inf,
-        gamma=agent_cfg["gamma"],
-        clip_reward=np.inf,
-    )
-
     env.action_space = gym.spaces.Box(
         low = -1,
         high = 1,
@@ -93,6 +82,7 @@ def main():
 
     if args_cli.checkpoint is None:
         policy_kwargs = dict(
+        features_extractor_class=PreProcess,
         net_arch=dict(pi=[1024, 512], vf=[1024, 512]),
         activation_fn=torch.nn.ReLU)
 
@@ -105,7 +95,6 @@ def main():
     else:
         checkpoint_path = args_cli.checkpoint
         agent = AMPPPO.load(checkpoint_path, env, print_system_info=True)
-
 
     new_logger = configure(log_dir, ["stdout", "tensorboard"])
     agent.set_logger(new_logger)
