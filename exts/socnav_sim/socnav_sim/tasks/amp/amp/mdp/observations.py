@@ -108,7 +108,8 @@ class ObsComputer():
         if events.amp_obs_reset is True:
             self.reset_amp_obs(events.amp_reset_env_ids,
                                events.amp_motion_ids,
-                               events.amp_motion_times)
+                               events.amp_motion_times,
+                               env)
             events.amp_obs_reset = False
             
         # update history amp observation
@@ -127,7 +128,7 @@ class ObsComputer():
 
         return reward
         
-    def reset_amp_obs(self, env_ids, motion_ids, motion_times):
+    def reset_amp_obs(self, env_ids, motion_ids, motion_times, env: ManagerBasedEnv):
         dt = 1 / 30
 
         motion_ids = motion_ids[env_ids]
@@ -149,6 +150,9 @@ class ObsComputer():
                 motion_res["root_ang_vel"], motion_res["dof_vel"], motion_res["key_pos"], motion_res["motion_bodies"], \
                     motion_res["motion_limb_weights"], motion_res["motion_aa"], motion_res["rg_pos"], \
                         motion_res["rb_rot"], motion_res["body_vel"], motion_res["body_ang_vel"]
+
+        origin_offsets = env.scene.env_origins[env_ids].repeat_interleave(9, dim=0)
+        root_pos += origin_offsets
 
         amp_obs_demo = build_amp_observations_smpl(
             root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel,
