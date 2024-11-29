@@ -63,7 +63,7 @@ To setup the IDE, please follow these instructions:
 If everything executes correctly, it should create a file .python.env in the `.vscode` directory. The file contains the python paths to all the extensions provided by Isaac Sim and Omniverse. This helps in indexing all the python modules for intelligent suggestions while writing code.
 
 ### Training scene
-![training for pacer](./assets/training_for_pacer "training for pace")
+![training for amp](./assets/training_results.gif "training for amp")
 
 ### motion visualization
 

@@ -33,12 +33,9 @@ import gymnasium as gym
 import os
 import torch
 
-from stable_baselines3 import PPO
 from omni.isaac.lab_tasks.utils.parse_cfg import load_cfg_from_registry, parse_env_cfg, get_checkpoint_path
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 from socnav_sim.tasks.amp.amp.policy import AMPPPO
-from stable_baselines3.common.vec_env import VecNormalize
-import numpy as np
 import socnav_sim.tasks  # noqa: F401
 
 def main():
@@ -63,16 +60,6 @@ def main():
     env = gym.make(args_cli.task, cfg=env_cfg)
     env = Sb3VecEnvWrapper(env) # type: ignore
     env.seed(seed=agent_cfg["seed"])
-
-    env = VecNormalize(
-        env,
-        training=False,
-        norm_obs=True,
-        norm_reward=False,
-        clip_obs=np.inf,
-        gamma=agent_cfg["gamma"],
-        clip_reward=np.inf,
-    )
 
     env.action_space = gym.spaces.Box(
         low = -1,

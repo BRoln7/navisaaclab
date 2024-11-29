@@ -100,7 +100,7 @@ def main():
     agent.set_logger(new_logger)
     print("[INFO]:agents loaded")
 
-    checkpoint_callback = CheckpointCallback(save_freq=10000, save_path=log_dir, name_prefix="model", verbose=2)
+    checkpoint_callback = CheckpointCallback(save_freq=2500, save_path=log_dir, name_prefix="model", verbose=2)
     agent.learn(total_timesteps=n_timesteps, callback=checkpoint_callback)
     agent.save(os.path.join(log_dir, "model"))
 
