@@ -5,7 +5,7 @@ from omni.isaac.lab.envs import ManagerBasedEnv
 from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import dof_gym_to_sim
 
 
-class JointPositionPacerAction(JointAction):
+class JointPositionAMPAction(JointAction):
     """Joint action term that applies the processed actions to the articulation's joints as position commands."""
 
     cfg: actions_cfg.JointPositionActionCfg
@@ -20,12 +20,12 @@ class JointPositionPacerAction(JointAction):
         self._raw_actions[:] = actions
         self._pd_actions = self._raw_actions * self._scale + self._offset
         self._processed_actions = self._pd_actions[:, dof_gym_to_sim]
-        self.freeze_hand_toe()
+        self.freeze_hands_toes()
 
     def apply_actions(self):
          self._asset.set_joint_position_target(self.processed_actions, joint_ids=self._joint_ids)
 
-    def freeze_hand_toe(self):
+    def freeze_hands_toes(self):
         freeze_joint_name = ['L_Hand_x', 'L_Hand_y', 'L_Hand_z',
                             'R_Hand_x', 'R_Hand_y', 'R_Hand_z',
                             'L_Toe_x', 'L_Toe_y', 'L_Toe_z',
@@ -34,13 +34,13 @@ class JointPositionPacerAction(JointAction):
         self._processed_actions[:, freeze_joint_idx[0]] = 0
 
 @configclass
-class JointPositionActionPacerCfg(JointActionCfg):
+class JointPositionActionAMPCfg(JointActionCfg):
     """Configuration for the joint position action term.
 
     See :class:`JointPositionAction` for more details.
     """
 
-    class_type: type[ActionTerm] = JointPositionPacerAction
+    class_type: type[ActionTerm] = JointPositionAMPAction
 
     use_default_offset: bool = True
     """Whether to use default joint positions configured in the articulation asset as offset.

@@ -5,7 +5,7 @@ from omni.isaac.lab.managers import SceneEntityCfg
 from omni.isaac.lab.assets import Articulation, RigidObject
 from omni.isaac.lab.envs import ManagerBasedRLEnv
 
-traj_reset_flag = None
+# traj_reset_flag = None
 
 def root_state_below_minimum(
     env: ManagerBasedRLEnv, minimum_height: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
@@ -17,8 +17,8 @@ def root_state_below_minimum(
     """
     asset: RigidObject = env.scene[asset_cfg.name]
     
-    idx = torch.nonzero(asset.data.root_pos_w[:, 2] < minimum_height).squeeze()
-    global traj_reset_flag
-    traj_reset_flag = idx
+    # idx = torch.nonzero(asset.data.root_pos_w[:, 2] < minimum_height).squeeze()
+    # global traj_reset_flag
+    # traj_reset_flag = idx
 
     return asset.data.root_pos_w[:, 2] < minimum_height

@@ -56,11 +56,6 @@ disc_coef = config['training']['disc_coef'] # type: ignore
 class PreProcess(BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Box, features_dim:int = 357):
       super(PreProcess, self).__init__(observation_space, features_dim)
-      self.task_mlp = nn.Sequential(
-          nn.Linear(1044, 512),
-          nn.ReLU(),
-          nn.Linear(512, 256),
-          nn.ReLU())
       self.running_mean_std = RunningMeanStd(obs_shape).to("cuda:0")
       if config['training']['train']: # type: ignore
           self.running_mean_std.train()

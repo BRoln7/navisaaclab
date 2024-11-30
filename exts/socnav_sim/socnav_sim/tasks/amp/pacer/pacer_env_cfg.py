@@ -27,7 +27,7 @@ obs_computer = mdp.ObsComputer()
 
 @configclass
 class PacerSceneCfg(InteractiveSceneCfg):
-    """Configuration for the terrain scene with a smpl_humanoid robot."""
+    """Configuration for the scene with amp task."""
 
     # ground
     ground = TerrainImporterCfg(
@@ -49,7 +49,7 @@ class PacerSceneCfg(InteractiveSceneCfg):
     # lights
     light = AssetBaseCfg(
         prim_path="/World/light",
-        spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
+        spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=10000.0),
     )
 
 
@@ -69,7 +69,7 @@ class CommandsCfg:
 class ActionsCfg:
     """Action specifications for the MDP."""
 
-    joint_pos = mdp.JointPositionActionPacerCfg(
+    joint_pos = mdp.JointPositionActionAMPCfg(
         asset_name="robot", joint_names=[".*"], scale=3.1416, offset=0.0,
     )
 
@@ -98,22 +98,20 @@ class EventCfg:
     """Configuration for events."""
 
     reset_base = EventTerm(
-        func=mdp.reset_root_state_motion,
+        func=mdp.reset_init_state_amp_motion,
         mode="reset",
-        params={"pose_range": {}, "velocity_range": {}},
     )
 
 
 @configclass
 class RewardsCfg:
     """Reward terms for the MDP."""
-    location_reward = RewTerm(mdp.compute_location_reward,
-                              weight= 0.5)
+    task_reward = RewTerm(mdp.compute_location_reward,
+                          weight=0.5)
     power_reward = RewTerm(mdp.compute_power_reward,
                            weight=0.5)
     amp_reward = RewTerm(obs_computer.compute_amp_reward,
                          weight=1.0)
-
 
 @configclass
 class TerminationsCfg:
@@ -156,6 +154,7 @@ class PacerEnvCfg(ManagerBasedRLEnvCfg):
         self.episode_length_s = 20
         # simulation settings
         self.sim.dt = 1 / 120.0
+
         self.sim.render_interval = self.decimation
         self.sim.physx.bounce_threshold_velocity = 0.2
         self.sim.physx.max_position_iteration_count = 4
@@ -165,7 +164,3 @@ class PacerEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.physics_material.static_friction = 1.0
         self.sim.physics_material.dynamic_friction = 1.0
         self.sim.physics_material.restitution = 0.0
-
-        
-
-

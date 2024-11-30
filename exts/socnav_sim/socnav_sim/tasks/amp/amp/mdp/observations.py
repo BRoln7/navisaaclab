@@ -23,8 +23,6 @@ from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
 )
 import socnav_sim.tasks.amp.amp.policy as policy
 import socnav_sim.tasks.amp.amp.mdp.events as events
-import socnav_sim.tasks.amp.amp.mdp.reset as reset
-import omni.isaac.lab.sim as sim_utils
 
 # config params
 
@@ -76,7 +74,7 @@ class ObsComputer():
         obs = compute_humanoid_observations_smpl_max(body_pos, body_rot, body_vel, body_ang_vel, 
                                                     local_root_obs_config, local_height_obs_config, 
                                                     upright_config)
-
+        
         return obs
     
     def compute_amp_reward(self,

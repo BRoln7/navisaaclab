@@ -1,10 +1,15 @@
 import argparse
-
+import os
+import yaml
 from omni.isaac.lab.app import AppLauncher
 
-parser = argparse.ArgumentParser(description="Train an RL agent for multi-agents task.")
-parser.add_argument("--num_envs", type=int, default=32, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'amp.yaml')
+with open(motion_file, 'r') as file:
+    config = yaml.safe_load(file)
+
+parser = argparse.ArgumentParser(description="Train an RL agent for amp task.")
+parser.add_argument("--num_envs", type=int, default=config['env']['num_envs'], help="Number of environments to simulate.") # type: ignore
+parser.add_argument("--task", type=str, default=config['env']['task'], help="Name of the task.") # type: ignore
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
 parser.add_argument("--checkpoint", type=str, default=None, help="Path to model checkpoint.")
@@ -24,8 +29,7 @@ import gymnasium as gym
 import os
 from datetime import datetime
 import torch
-
-from stable_baselines3 import PPO
+import numpy as np
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.logger import configure
 
@@ -36,7 +40,8 @@ import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg, get_checkpoint_path
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 import socnav_sim.tasks
-from policy import TaskMLP, SymPPO
+from socnav_sim.tasks.amp.pacer.policy import TaskMLP, AMPPPO
+from socnav_sim.tasks.amp.amp_utils.utils.discriminator import bias_init
 import os
 
 
@@ -80,21 +85,19 @@ def main():
         net_arch=dict(pi=[2048, 1024], vf=[2048, 1024]),
         activation_fn=torch.nn.ReLU)
 
-        agent = SymPPO(policy_arch, env, verbose=2, **agent_cfg, policy_kwargs=policy_kwargs)
-        new_logger = configure(log_dir, ["stdout", "tensorboard"])
-        agent.set_logger(new_logger)
-        checkpoint_path = os.path.join(os.getcwd(), 'models', 'pacer', 'pacer_ppo.pth')
-        checkpoint = torch.load(checkpoint_path)
-        agent.policy.load_state_dict(checkpoint)
-        print("[INFO]:agents loaded")
+        agent = AMPPPO(policy_arch, env, verbose=2, **agent_cfg, policy_kwargs=policy_kwargs)
+        agent.policy.apply(bias_init)
+        with torch.no_grad():
+            agent.policy.log_std.fill_(np.float64(-2.9))
+        agent.policy.log_std.requires_grad = False
 
     else:
         checkpoint_path = args_cli.checkpoint
-        agent = SymPPO.load(checkpoint_path, env, print_system_info=True)
-        new_logger = configure(log_dir, ["stdout", "tensorboard"])
-        agent.set_logger(new_logger)
-        print("[INFO]:agents loaded")
+        agent = AMPPPO.load(checkpoint_path, env, print_system_info=True)
 
+    new_logger = configure(log_dir, ["stdout", "tensorboard"])
+    agent.set_logger(new_logger)
+    print("[INFO]:agents loaded")
 
     checkpoint_callback = CheckpointCallback(save_freq=5000, save_path=log_dir, name_prefix="model", verbose=2)
     agent.learn(total_timesteps=n_timesteps, callback=checkpoint_callback)
