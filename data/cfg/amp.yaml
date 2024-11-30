@@ -1,0 +1,18 @@
+# config.yaml
+
+#model:
+#  type: "PPO"
+#  hidden_size: 256
+#  activation: "relu"
+
+training:
+  train: True
+  lr: 2e-5
+  disc_coef: 5
+  bound_loss: 10
+  # data_file: 'smpl_humanoid_walk_slow.pkl'
+  data_file: 'amass_isaac_run_upright_slim.pkl'
+
+env:
+  num_envs: 8
+  task: Isaac-AMP
