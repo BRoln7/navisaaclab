@@ -12,7 +12,7 @@ parser.add_argument("--num_envs", type=int, default=config['env']['num_envs'], h
 parser.add_argument("--task", type=str, default=config['env']['task'], help="Name of the task.") # type: ignore
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
-parser.add_argument("--checkpoint", type=str, default=None, help="Path to model checkpoint.")
+parser.add_argument("--checkpoint", type=str, default=config['training']['checkpoint'], help="Path to model checkpoint.") # type: ignore
 parser.add_argument(
     "--use_last_checkpoint",
     action="store_true",
@@ -100,7 +100,7 @@ def main():
     agent.set_logger(new_logger)
     print("[INFO]:agents loaded")
 
-    checkpoint_callback = CheckpointCallback(save_freq=5000, save_path=log_dir, name_prefix="model", verbose=2)
+    checkpoint_callback = CheckpointCallback(save_freq=10000, save_path=log_dir, name_prefix="model", verbose=2)
     agent.learn(total_timesteps=n_timesteps, callback=checkpoint_callback)
     agent.save(path=os.path.join(log_dir, "model"))
 

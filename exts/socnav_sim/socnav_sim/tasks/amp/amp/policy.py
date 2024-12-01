@@ -157,13 +157,16 @@ class AMPDemoBuffer():
 ################### discriminator network ######################
 ################################################################
 global discriminator
-discriminator = Discriminator()
-bias_init(discriminator)
+global amp_input_mean_std
+if config['training']['checkpoint'] is None: # type: ignore
+    discriminator = Discriminator()
+    bias_init(discriminator)
+    amp_input_mean_std = RunningMeanStd(1950).to("cuda:0")
+else:
+    discriminator = torch.load(config['training']['checkpoint']) # type: ignore
+    amp_input_mean_std = torch.load(config['training']['checkpoint']) # type: ignore
 discriminator.to("cuda:0")
 discriminator.train()
-
-global amp_input_mean_std
-amp_input_mean_std = RunningMeanStd(1950).to("cuda:0")
 amp_input_mean_std.train()
 ################################################################
 ########################## AMP PPO #############################

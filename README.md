@@ -64,6 +64,7 @@ If everything executes correctly, it should create a file .python.env in the `.v
 
 ### Training scene
 ![training for amp](./assets/walk_results.gif "training for amp")
+![training for amp](./assets/pacer_motion_results.gif "training for amp")
 
 ### motion visualization
 
