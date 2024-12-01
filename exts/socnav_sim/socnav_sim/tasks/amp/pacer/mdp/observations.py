@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import torch
+import numpy as np
 import os
 import yaml
 from typing import TYPE_CHECKING
@@ -19,6 +20,7 @@ from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
     root_states_wxyz_to_xyzw,
     compute_location_observations,
     build_amp_observations_smpl,
+    get_height_maps_jit,
     dof_sim_to_gym,
     body_sim_to_gym,
     dof_subset,
@@ -79,6 +81,9 @@ class ObsComputer():
         self._has_dof_subset = True
         self._has_shape_obs_disc = False
         self.dof_subset = dof_subset
+        self.height_sample_width = 1.0
+        self.num_samples_per_axis = 16
+        self.height_sample_init_flag = False
 
         self.amp_obs_buf = torch.zeros(
             (num_envs, 10, amp_obs_shape_step), device="cuda:0", dtype=torch.float)
@@ -196,10 +201,6 @@ class ObsComputer():
             self._traj_gen_init = True
             self._build_traj_generator(env, asset_cfg)
 
-        traj_samples = self._fetch_traj_samples(env)
-        root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)
-        obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)
-
         # for traj_reset
         root_pos = asset.data.root_pos_w[:, 0:3]
         if events.amp_obs_reset is True:
@@ -207,27 +208,80 @@ class ObsComputer():
             self._traj_gen.reset(events.amp_reset_env_ids, root_pos_reset) # type: ignore
             self.progress_buf[events.amp_reset_env_ids] = 0 # type: ignore
 
+        traj_samples = self._fetch_traj_samples(env)
+        root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)
+        obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)
+
         trajectory_marker.visualize(translations=traj_samples.reshape(-1, 3))
         
         return obs
     
     def compute_height_obs(self,
-                           env: ManagerBasedEnv,
+                           env: ManagerBasedEnv, 
+                           asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
                         ) -> torch.Tensor:
-        if self._traj_gen_init:
-            self.measured_heights = torch.zeros(env.num_envs, self.num_height_points,  # type: ignore
-                                                device=env.device, requires_grad=False)
-            
-            center_heights = torch.zeros(env.num_envs, self.num_center_height_points, # type: ignore
-                                device=env.device, requires_grad=False)
-            center_heights = center_heights.mean(dim=-1, keepdim=True)
-            heights = center_heights - self.measured_heights
-            heights = torch.clip(heights, -3, 3.) * self.height_meas_scale
-        else:
-            return torch.zeros(env.num_envs, 1024).to(env.device)
+        if self.height_sample_init_flag is False:
+            self.height_points = self.init_height_points()
+            self.height_sample_init_flag = True
 
-        return heights
+        asset: Articulation = env.scene[asset_cfg.name]
+        root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)[..., :7]
+        base_pos = root_states[..., :3]
+
+        self.height_samples = torch.zeros((2800, 1400), device='cuda:0')
+
+        height_obs = get_height_maps_jit(
+            root_states=root_states,
+            base_pos=base_pos,
+            env_ids=torch.arange(0, env.num_envs, 1).to('cuda:0'),
+            num_envs=num_envs,
+            height_points=self.height_points,
+            height_samples=self.height_samples,
+            num_height_points=self.num_height_points,
+            terrain_horizontal_scale=0.1,
+            w_last=True,
+            return_all_dims=False,
+        )
+
+        return height_obs
     
+    def init_height_points(self):
+        """
+        Pre-defines the grid for the height-map observation.
+        """
+        y = torch.tensor(
+            np.linspace(
+                -self.height_sample_width,
+                self.height_sample_width,
+                self.num_samples_per_axis,
+            ),
+            device="cuda:0",
+            requires_grad=False,
+        )
+        x = torch.tensor(
+            np.linspace(
+                -self.height_sample_width,
+                self.height_sample_width,
+                self.num_samples_per_axis,
+            ),
+            device="cuda:0",
+            requires_grad=False,
+        )
+        grid_x, grid_y = torch.meshgrid(x, y)
+
+        self.num_height_points = grid_x.numel()
+        points = torch.zeros(
+            num_envs,
+            self.num_height_points,
+            3,
+            device='cuda:0',
+            requires_grad=False,
+        )
+        points[:, :, 0] = grid_x.flatten()
+        points[:, :, 1] = grid_y.flatten()
+        return points
+    
+
     def compute_amp_reward(self,
                         env: ManagerBasedEnv, 
                         asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")

@@ -65,15 +65,15 @@ def copysign(a, b):
     return torch.abs(a) * torch.sign(b)
 
 
-@torch.jit.script
-def torch_rand_float(lower, upper, shape, device):
-    return (upper - lower) * torch.rand(*shape, device=device) + lower
+# @torch.jit.script
+# def torch_rand_float(lower, upper, shape, device):
+#     return (upper - lower) * torch.rand(*shape, device=device) + lower
 
 
-@torch.jit.script
-def torch_random_dir_2(shape, device):
-    angle = torch_rand_float(-np.pi, np.pi, shape, device).squeeze(-1)
-    return torch.stack([torch.cos(angle), torch.sin(angle)], dim=-1)
+# @torch.jit.script
+# def torch_random_dir_2(shape, device):
+#     angle = torch_rand_float(-np.pi, np.pi, shape, device).squeeze(-1)
+#     return torch.stack([torch.cos(angle), torch.sin(angle)], dim=-1)
 
 
 @torch.jit.script

@@ -19,7 +19,8 @@ from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
     build_amp_observations_smpl,
     dof_sim_to_gym,
     body_sim_to_gym,
-    dof_subset
+    dof_subset,
+    body_flip_left_to_right_index
 )
 import socnav_sim.tasks.amp.amp.policy as policy
 import socnav_sim.tasks.amp.amp.mdp.events as events
@@ -75,6 +76,43 @@ class ObsComputer():
                                                     local_root_obs_config, local_height_obs_config, 
                                                     upright_config)
         
+        global flip_humanoid_obs
+        flip_humanoid_obs = self.compute_flip_humanoid_obs(env, asset_cfg).reshape(num_envs, -1).unsqueeze(0)
+
+        return obs
+    
+    def compute_flip_humanoid_obs(self, 
+                             env: ManagerBasedEnv, 
+                             asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+                        ) -> torch.Tensor:
+        asset: Articulation = env.scene[asset_cfg.name]
+
+        upright_config = True
+        local_root_obs_config = True
+        local_height_obs_config = False
+
+        body_pos = asset.data.body_pos_w[:, body_sim_to_gym]
+        body_rot = rot_wxyz_to_xyzw(asset.data.body_quat_w)[:, body_sim_to_gym]
+        body_vel = asset.data.body_lin_vel_w[:, body_sim_to_gym]
+        body_ang_vel = asset.data.body_ang_vel_w[:, body_sim_to_gym]
+
+        body_pos[..., 1] *= -1 # position
+        body_pos = body_pos[..., body_flip_left_to_right_index, :]
+
+        body_rot[..., 0] *= -1 # angular rotation, global
+        body_rot[..., 2] *= -1
+        body_rot = body_rot[..., body_flip_left_to_right_index, :]
+
+        body_vel[..., 1] *= -1 # linear velocity
+        body_vel = body_vel[..., body_flip_left_to_right_index, :]
+
+        body_ang_vel[..., 0] *= -1 # angular velocity
+        body_ang_vel[..., 2] *= -1
+        body_ang_vel = body_ang_vel[..., body_flip_left_to_right_index, :]
+
+        obs = compute_humanoid_observations_smpl_max(body_pos, body_rot, body_vel, body_ang_vel, 
+                                                    local_root_obs_config, local_height_obs_config, 
+                                                    upright_config)
         return obs
     
     def compute_amp_reward(self,

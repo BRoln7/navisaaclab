@@ -1,5 +1,5 @@
 import torch
-from socnav_sim.tasks.amp.amp_utils.isaac_utils import torch_utils, gym_utils
+from socnav_sim.tasks.amp.amp_utils.isaac_utils import torch_utils, gym_utils, rotations
 
 # without hands and toes
 dof_subset = torch.tensor([ 
@@ -38,6 +38,7 @@ dof_vel_init = torch.tensor(
       0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00]]).to("cuda:0")
 
 body_flip_left_to_right_index = [0, 5, 6, 7, 8, 1, 2, 3, 4, 9, 10, 11, 12, 13, 19, 20, 21, 22, 23, 14, 15, 16, 17, 18]
+flip_loss_left_to_right_index = [4, 5, 6, 7, 0, 1, 2, 3, 8, 9, 10, 11, 12, 18, 19, 20, 21, 22, 13, 14, 15, 16, 17]
 
 key_body_names = ["R_Ankle", "L_Ankle", "R_Wrist", "L_Wrist"]
 
@@ -268,3 +269,74 @@ def build_amp_observations_smpl(root_pos, root_rot, root_vel, root_ang_vel,
     ]
     obs = torch.cat(obs_list, dim=-1)
     return obs
+
+@torch.jit.script_if_tracing
+def get_height_maps_jit(
+    root_states: torch.tensor,
+    base_pos: torch.tensor,
+    env_ids: torch.tensor,
+    num_envs: int,
+    height_points: torch.tensor,
+    height_samples: torch.tensor,
+    num_height_points: int,
+    terrain_horizontal_scale: float,
+    w_last: bool,
+    return_all_dims: bool,
+):
+    base_quat = root_states[:, 3:7]
+
+    points = rotations.quat_apply_yaw(
+        base_quat.repeat(1, num_height_points), height_points[env_ids], w_last
+    ) + (base_pos[:, :3]).unsqueeze(1)
+
+    points = points / terrain_horizontal_scale
+    floored_points = points.long()
+    # this encompases 4 possible points.
+    # points are the top left corner of the 4 points
+    # we will interpolate between the 4 points to get the height
+    px = floored_points[:, :, 0].view(-1)
+    py = floored_points[:, :, 1].view(-1)
+    px = torch.clip(px, 0, height_samples.shape[0] - 2)
+    py = torch.clip(py, 0, height_samples.shape[1] - 2)
+
+    # Calculate the fractional part of the points' positions
+    fx = points[:, :, 0].view(-1) - px.float()
+    fy = points[:, :, 1].view(-1) - py.float()
+
+    # Get the heights of the four surrounding points
+    h_tl = height_samples[px, py]  # Top-left
+    h_tr = height_samples[px + 1, py]  # Top-right
+    h_bl = height_samples[px, py + 1]  # Bottom-left
+    h_br = height_samples[px + 1, py + 1]  # Bottom-right
+
+    # Perform bilinear interpolation
+    h_t = h_tl + (h_tr - h_tl) * fx  # Top interpolation
+    h_b = h_bl + (h_br - h_bl) * fx  # Bottom interpolation
+    interpolated_heights = h_t + (h_b - h_t) * fy  # Final interpolation
+
+    # heights = torch.min(heights1, heights2).view(num_envs, -1)
+    heights = base_pos[:, 2:3] - interpolated_heights.view(num_envs, -1)
+
+    if False:  ## TODO support this --> self.config.terrain.velocity_map:
+        velocity_map = torch.zeros((num_envs, self.num_height_points, 2)).to(points)
+
+        velocities = self.get_humanoid_root_velocities()[env_ids]
+
+        heading_rot = torch_utils.calc_heading_quat_inv(base_quat, self.w_last)
+
+        linear_vel_ego = torch_utils.quat_rotate(heading_rot, velocities, self.w_last)
+        velocity_map[:] = (
+            velocity_map[:] - linear_vel_ego[:, None, :2]
+        )  # Flip velocity to be in agent's point of view
+
+    if return_all_dims:
+        # This is only for visualization purposes, plotting the height map the humanoid sees
+        points = rotations.quat_apply_yaw(
+            base_quat.repeat(1, num_height_points), height_points[env_ids], w_last
+        ) + (base_pos[:, :3]).unsqueeze(1)
+        heights = interpolated_heights.view(num_envs, -1, 1)
+        return torch.cat(
+            [points[..., :2].view(num_envs, -1, 2), heights], dim=-1
+        ).clone()
+
+    return heights.view(num_envs, -1).clone()

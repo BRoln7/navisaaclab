@@ -14,7 +14,7 @@ parser.add_argument("--num_envs", type=int, default=config['env']['num_envs'], h
 parser.add_argument("--task", type=str, default=config['env']['task'], help="Name of the task.") # type: ignore
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
-parser.add_argument("--checkpoint", type=str, default=None, help="Path to model checkpoint.")
+parser.add_argument("--checkpoint", type=str, default=config['training']['checkpoint'], help="Path to model checkpoint.") # type: ignore
 parser.add_argument(
     "--use_last_checkpoint",
     action="store_true",
