@@ -85,16 +85,16 @@ def main():
         features_extractor_class=PreProcess,
         net_arch=dict(pi=[1024, 512], vf=[1024, 512]),
         activation_fn=torch.nn.ReLU)
-
         agent = AMPPPO(policy_arch, env, verbose=2, **agent_cfg, policy_kwargs=policy_kwargs)
-        agent.policy.apply(bias_init)
-        with torch.no_grad():
-            agent.policy.log_std.fill_(np.float64(-2.9))
-        agent.policy.log_std.requires_grad = False
 
     else:
         checkpoint_path = args_cli.checkpoint
         agent = AMPPPO.load(checkpoint_path, env, print_system_info=True)
+
+    agent.policy.apply(bias_init)
+    with torch.no_grad():
+        agent.policy.log_std.fill_(np.float64(-2.9))
+    agent.policy.log_std.requires_grad = False
 
     new_logger = configure(log_dir, ["stdout", "tensorboard"])
     agent.set_logger(new_logger)

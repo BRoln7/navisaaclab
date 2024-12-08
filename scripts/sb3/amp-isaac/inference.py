@@ -44,14 +44,8 @@ def main():
 
     log_root_path = os.path.join("logs", "sb3", args_cli.task)
     log_root_path = os.path.abspath(log_root_path)
-    if args_cli.checkpoint is None:
-        if args_cli.use_last_checkpoint:
-            checkpoint = "model_.*.zip"
-        else:
-            checkpoint = "model.zip"
-        checkpoint_path = get_checkpoint_path(log_root_path, ".*", checkpoint)
-    else:
-        checkpoint_path = args_cli.checkpoint
+    
+    checkpoint_path = args_cli.checkpoint
 
     agent_cfg = process_sb3_cfg(agent_cfg) # type: ignore
     policy_arch = agent_cfg.pop("policy")

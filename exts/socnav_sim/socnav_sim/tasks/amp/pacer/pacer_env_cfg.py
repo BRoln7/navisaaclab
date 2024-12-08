@@ -49,7 +49,7 @@ class PacerSceneCfg(InteractiveSceneCfg):
     # lights
     light = AssetBaseCfg(
         prim_path="/World/light",
-        spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=10000.0),
+        spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
 
 
@@ -109,7 +109,7 @@ class RewardsCfg:
     task_reward = RewTerm(mdp.compute_location_reward,
                           weight=0.5)
     power_reward = RewTerm(mdp.compute_power_reward,
-                           weight=0.5)
+                           weight=0.0)
     amp_reward = RewTerm(obs_computer.compute_amp_reward,
                          weight=1.0)
 
@@ -135,7 +135,7 @@ class PacerEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the MuJoCo-style Humanoid walking environment."""
 
     # Scene settings
-    scene: PacerSceneCfg = PacerSceneCfg(num_envs=8, env_spacing=2.5)
+    scene: PacerSceneCfg = PacerSceneCfg(num_envs=8, env_spacing=6)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()

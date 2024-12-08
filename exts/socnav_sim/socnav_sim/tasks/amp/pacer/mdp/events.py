@@ -4,7 +4,7 @@ from omni.isaac.lab.managers import SceneEntityCfg
 from omni.isaac.lab.assets import Articulation, RigidObject
 import omni.isaac.lab.utils.math as math_utils
 from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import dof_gym_to_sim
-import socnav_sim.tasks.amp.amp.policy as policy
+import socnav_sim.tasks.amp.pacer.policy as policy
 
 amp_obs_reset = False
 

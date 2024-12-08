@@ -108,6 +108,20 @@ def root_states_wxyz_to_xyzw(rot_obs):
     rot_obs[:, wxyz_to_xyzw] = rot_obs.clone()
     return rot_obs
 
+@torch.jit.script
+def quat_to_rot_z(q):
+    w, x, y, z = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
+    angle_z = 2 * torch.atan2(z, w)
+    cos_a = torch.cos(angle_z)
+    sin_a = torch.sin(angle_z)
+    
+    R_z = torch.stack([
+        cos_a, -sin_a, torch.zeros_like(cos_a),
+        sin_a, cos_a, torch.zeros_like(sin_a),
+        torch.zeros_like(cos_a), torch.zeros_like(sin_a), torch.ones_like(cos_a)
+    ], dim=-1).reshape(-1, 3, 3)
+    return R_z
+
 
 @torch.jit.script
 def remove_base_rot(quat):

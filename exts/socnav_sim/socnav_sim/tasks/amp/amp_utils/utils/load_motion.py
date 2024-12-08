@@ -49,7 +49,7 @@ class MotionLoad():
 
     def sample_ref_state(self, num_envs):
         curr_gender_betas = torch.zeros(num_envs, 17).to("cuda:0")
-        motion_ids = self.motion_lib.sample_motions(num_envs)
+        motion_ids = self.motion_lib.sample_motions(num_envs) # type: ignore
         motion_times = self.motion_lib.sample_time(motion_ids)
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, \
             dof_vel, key_pos, rb_pos, rb_rot, body_vel, body_ang_vel = self.get_fixed_smpl_state_from_motionlib(
@@ -57,6 +57,15 @@ class MotionLoad():
 
         return motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot
 
+    def viusual_from_start(self, num_envs):
+        curr_gender_betas = torch.zeros(num_envs, 17).to("cuda:0")
+        motion_ids = self.motion_lib.sample_motions(num_envs) # type: ignore
+        motion_times = torch.zeros(num_envs).to("cuda:0")
+        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, \
+            dof_vel, key_pos, rb_pos, rb_rot, body_vel, body_ang_vel = self.get_fixed_smpl_state_from_motionlib(
+            motion_ids, motion_times, curr_gender_betas)
+
+        return motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot
 
     def get_fixed_smpl_state_from_motionlib(self, motion_ids, motion_times, curr_gender_betas):
         motion_res = self.get_smpl_state_from_motionlib_cache(motion_ids, motion_times)

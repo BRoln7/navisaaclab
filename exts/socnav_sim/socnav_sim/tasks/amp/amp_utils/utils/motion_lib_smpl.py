@@ -174,6 +174,9 @@ class MotionLib():
         self._key_body_ids = torch.tensor(key_body_ids, device=device)
         self._device = device
         self._motion_data = joblib.load(motion_file)
+        # motion_data_tmp1 = joblib.load(motion_file)['0-KIT_4_RightTurn03_poses']
+        # self._motion_data = {}
+        # self._motion_data['0-KIT_4_RightTurn03_poses'] = motion_data_tmp1
 
         if min_length != -1:
             data_list = {k: v for k, v in list(self._motion_data.items()) if len(v['pose_quat_global']) >= min_length}

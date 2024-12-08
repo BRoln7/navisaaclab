@@ -24,30 +24,22 @@ from socnav_sim.tasks.amp.amp_utils.utils.load_motion import MotionLoad
 from socnav_sim.tasks.amp.amp_utils.utils.discriminator import Discriminator, bias_init
 from socnav_sim.tasks.amp.amp_utils.isaac_utils.gym_utils import to_torch
 from socnav_sim.tasks.amp.amp_utils.utils.running_mean_std import RunningMeanStd
-from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import body_flip_left_to_right_index
+from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import flip_loss_left_to_right_index
 import importlib
 
-obs_shape = 1401
-self_obs_shape = 357
+obs_shape = 357+20+256
 amp_demo_buffer_size = 200000
 amp_batch_size = 512
-
-SEED = 4801
-seed = 0
-random.seed(seed)
-np.random.seed(SEED)
-torch.manual_seed(seed)
-os.environ['PYTHONHASHSEED'] = str(seed)
-torch.cuda.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)
 
 motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'amp.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 
 num_envs = config['env']['num_envs'] # type: ignore
-global motion_load
-motion_load = MotionLoad(num_envs)
+
+if config['env']['task'] == 'Isaac-Pacer': # type: ignore
+    global motion_load
+    motion_load = MotionLoad(num_envs)
 
 disc_coef = config['training']['disc_coef'] # type: ignore
 
@@ -55,7 +47,7 @@ disc_coef = config['training']['disc_coef'] # type: ignore
 ################## preprocess #####################
 ###################################################
 class PreProcess(BaseFeaturesExtractor):
-    def __init__(self, observation_space: gym.spaces.Box, features_dim:int = 613):
+    def __init__(self, observation_space: gym.spaces.Box, features_dim:int = obs_shape):
       super(PreProcess, self).__init__(observation_space, features_dim)
       self.running_mean_std = RunningMeanStd(obs_shape).to("cuda:0")
       if config['training']['train']: # type: ignore
@@ -117,7 +109,7 @@ class AMPDemoBuffer():
     
     def build_amp_obs_demo(self, motion_ids, motion_times0):
         # Compute observation for the motion starting point
-        dt = 1 / 30
+        dt = 1 / 120
         motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, self.num_amp_obs_steps])
 
         motion_times = motion_times0.unsqueeze(-1)
@@ -158,13 +150,21 @@ class AMPDemoBuffer():
 ################### discriminator network ######################
 ################################################################
 global discriminator
-discriminator = Discriminator()
-bias_init(discriminator)
+global amp_input_mean_std
+if config['training']['checkpoint'] is None: # type: ignore
+    discriminator = Discriminator()
+    bias_init(discriminator)
+    amp_input_mean_std = RunningMeanStd(1950).to("cuda:0")
+elif config['training']['train'] == True: # type: ignore
+    discriminator = torch.load(config['training']['disc_checkpoint']) # type: ignore
+    amp_input_mean_std = torch.load(config['training']['std_checkpoint']) # type: ignore
+else: 
+    discriminator = Discriminator()
+    bias_init(discriminator)
+    amp_input_mean_std = RunningMeanStd(1950).to("cuda:0")
+
 discriminator.to("cuda:0")
 discriminator.train()
-
-global amp_input_mean_std
-amp_input_mean_std = RunningMeanStd(1950).to("cuda:0")
 amp_input_mean_std.train()
 ################################################################
 ########################## AMP PPO #############################
@@ -181,6 +181,10 @@ class AMPPPO(PPO):
         self.amp_replay_buffer = ReplayBuffer(amp_demo_buffer_size, "cuda:0")
         # flip obs buffer
         self.flip_obs_buffer = torch.tensor([]).to("cuda:0")
+
+        if config['training']['checkpoint'] is not None and config['training']['train']: # type: ignore
+            self.amp_demo_buffer = torch.load(config['training']['ampbuffer_checkpoint']) # type: ignore
+            self.amp_replay_buffer = torch.load(config['training']['replaybuffer_checkpoint']) # type: ignore
 
         self._amp_replay_keep_prob = 0.01
         self._disc_logit_reg = 0.01
@@ -212,7 +216,7 @@ class AMPPPO(PPO):
         rollout_buffer: RolloutBuffer,
         n_rollout_steps: int,
     ) -> bool:
-        ########################### import amp obs ###############################
+        ########################### import amp obs ##############################
         obs = importlib.import_module("socnav_sim.tasks.amp.pacer.mdp.observations")
 
         assert self._last_obs is not None, "No previous observation was provided"
@@ -225,9 +229,10 @@ class AMPPPO(PPO):
 
         callback.on_rollout_start()
         
-        ############################ clear buffer #################################
+        ################### init buffer ######################
         self.amp_buffer = torch.tensor([]).to("cuda:0")
         self.flip_obs_buffer = torch.tensor([]).to("cuda:0")
+        self.flip_obs_buffer = obs.flip_humanoid_obs
 
         while n_steps < n_rollout_steps:
             if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
@@ -289,11 +294,9 @@ class AMPPPO(PPO):
                 self.amp_buffer = obs.amp_replay_obs
             else:
                 self.amp_buffer = torch.cat((self.amp_buffer, obs.amp_replay_obs), dim=0)
-            
-            if self.flip_obs_buffer.numel() == 0:
-                self.flip_obs_buffer = obs.flip_humanoid_obs
-            else:
-                self.flip_obs_buffer = torch.cat([self.flip_obs_buffer, obs.flip_humanoid_obs], dim=0)
+
+            self.flip_obs_buffer = torch.cat([self.flip_obs_buffer, obs.flip_humanoid_obs], dim=0)
+
 
         with torch.no_grad():
             values = self.policy.predict_values(obs_as_tensor(new_obs, self.device))  # type: ignore[arg-type]
@@ -321,6 +324,10 @@ class AMPPPO(PPO):
         pg_losses, value_losses = [], []
         clip_fractions = []
         sym_loss = []
+
+        ############################## reshape flip_obs_buffer for training ##########################
+        self.flip_obs_buffer = self.flip_obs_buffer.reshape(self.flip_obs_buffer.size(0)*
+                                                            self.flip_obs_buffer.size(1), -1)
 
         continue_training = True
         for epoch in range(self.n_epochs):
@@ -372,14 +379,17 @@ class AMPPPO(PPO):
                 ##################################################################
                 flip_obs_batch = self.flip_obs_buffer[flip_batch_index * self.batch_size:
                                                       (flip_batch_index+1) * self.batch_size]
-                orig_obs_batch = rollout_data.observations
+                orig_obs_batch = torch.tensor(
+                    self.rollout_buffer.observations[flip_batch_index * self.batch_size:
+                                                     (flip_batch_index+1) * self.batch_size]).to("cuda:0")
+                flip_batch_index += 1
 
                 self.sym_loss_coef = 1
                 s_info = self.sym_loss(flip_obs_batch, orig_obs_batch)
                 s_loss = s_info['sym_loss']
                 s_loss = torch.mean(s_loss)
                 s_loss = s_loss * self.sym_loss_coef
-                sym_loss.append(s_loss)
+                sym_loss.append(s_loss.cpu().detach().numpy())
 
                 loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss + s_loss
 
@@ -412,14 +422,14 @@ class AMPPPO(PPO):
         self.logger.record("train/clip_fraction", np.mean(clip_fractions))
         self.logger.record("train/loss", loss.item())
         self.logger.record("train/explained_variance", explained_var)
-        self.logger.record("train/sym_loss", np.mean(s_loss))
+        self.logger.record("train/sym_loss", np.mean(sym_loss))
         if hasattr(self.policy, "log_std"):
             self.logger.record("train/std", torch.exp(self.policy.log_std).mean().item())
         self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
         self.logger.record("train/clip_range", clip_range)
         if self.clip_range_vf is not None:
             self.logger.record("train/clip_range_vf", clip_range_vf)
-
+        
         ##################################################################
         ######################## from here amp ###########################
         ##################################################################
@@ -440,17 +450,9 @@ class AMPPPO(PPO):
         for epoch in range(self.n_epochs):
             optim_times = math.ceil(self.amp_buffer.shape[0] * self.amp_buffer.shape[1] / self.batch_size)
             for mini_batch in range(optim_times):
-                if (mini_batch+1) * self.batch_size < self.amp_buffer.shape[0] * self.amp_buffer.shape[1]:
-                    amp_obs_batch = amp_obs[mini_batch*self.batch_size : 
-                                            (mini_batch+1)*self.batch_size]
-                    amp_obs_replay_batch = amp_obs_replay[mini_batch*self.batch_size : 
-                                                          (mini_batch+1)*self.batch_size]
-                    amp_obs_demo_batch = amp_obs_demo[mini_batch*self.batch_size : 
-                                                      (mini_batch+1)*self.batch_size]
-                else:
-                    amp_obs_batch = amp_obs[mini_batch*self.batch_size:]
-                    amp_obs_replay_batch = amp_obs_replay[mini_batch*self.batch_size:]
-                    amp_obs_demo_batch = amp_obs_demo[mini_batch*self.batch_size:]
+                amp_obs_demo_batch = amp_obs_demo[torch.randperm(amp_obs_demo.size(0))[:self.batch_size]]
+                amp_obs_replay_batch = amp_obs_replay[torch.randperm(amp_obs_replay.size(0))[:self.batch_size]]
+                amp_obs_batch = amp_obs[torch.randperm(amp_obs.size(0))[:self.batch_size]]
 
                 amp_obs_demo_batch.requires_grad_(True)
                 disc_agent_logit = discriminator.get_logit(amp_obs_batch)
@@ -477,13 +479,18 @@ class AMPPPO(PPO):
     def save(
         self,
         path,
-        exclude = None,
+        exclude = ['amp_demo_buffer', 'amp_replay_buffer'],
         include = None,
     ) -> None:
+        self.amp_buffer = torch.tensor([]).to("cuda:0")
         self.flip_obs_buffer = torch.tensor([]).to("cuda:0")
         super().save(path, exclude, include)
-        torch.save(discriminator, f='logs/sb3/Isaac-AMP/discriminator.pth')
-        torch.save(amp_input_mean_std, f='logs/sb3/Isaac-AMP/amp_input_mean_std.pth')
+        
+        torch.save(discriminator, f='logs/sb3/Isaac-Pacer/discriminator.pth')
+        torch.save(amp_input_mean_std, f='logs/sb3/Isaac-Pacer/amp_input_mean_std.pth')
+
+        torch.save(self.amp_demo_buffer, "/home/social-navigation/data/amp_demo_buffer.pth")
+        torch.save(self.amp_replay_buffer, "/home/social-navigation/data/amp_replay_buffer.pth")
 
 
     def _disc_loss_neg(self, disc_logits):
@@ -563,9 +570,9 @@ class AMPPPO(PPO):
     def sym_loss(self, flip_obs_batch, orig_obs_batch):
         B, _ = flip_obs_batch.shape
 
-        left_to_right_index = body_flip_left_to_right_index
-        flip_a, flip_s = self.policy(flip_obs_batch)
-        orig_a, orig_s = self.policy(orig_obs_batch)
+        left_to_right_index = flip_loss_left_to_right_index
+        flip_a, flip_s, _ = self.policy(flip_obs_batch)
+        orig_a, orig_s, _ = self.policy(orig_obs_batch)
 
         orig_a = orig_a.view(B, -1, 3)
         orig_a[..., 0] *= -1

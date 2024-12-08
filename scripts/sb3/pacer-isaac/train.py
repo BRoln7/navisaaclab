@@ -12,7 +12,7 @@ parser.add_argument("--num_envs", type=int, default=config['env']['num_envs'], h
 parser.add_argument("--task", type=str, default=config['env']['task'], help="Name of the task.") # type: ignore
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
-parser.add_argument("--checkpoint", type=str, default=None, help="Path to model checkpoint.")
+parser.add_argument("--checkpoint", type=str, default=config['training']['checkpoint'], help="Path to model checkpoint.") # type: ignore
 parser.add_argument(
     "--use_last_checkpoint",
     action="store_true",
@@ -40,7 +40,7 @@ import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg, get_checkpoint_path
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 import socnav_sim.tasks
-from socnav_sim.tasks.amp.pacer.policy import TaskMLP, AMPPPO
+from socnav_sim.tasks.amp.pacer.policy import PreProcess, AMPPPO
 from socnav_sim.tasks.amp.amp_utils.utils.discriminator import bias_init
 import os
 
@@ -81,25 +81,26 @@ def main():
 
     if args_cli.checkpoint is None:
         policy_kwargs = dict(
-        features_extractor_class=TaskMLP,
+        features_extractor_class=PreProcess,
         net_arch=dict(pi=[2048, 1024], vf=[2048, 1024]),
         activation_fn=torch.nn.ReLU)
 
         agent = AMPPPO(policy_arch, env, verbose=2, **agent_cfg, policy_kwargs=policy_kwargs)
         agent.policy.apply(bias_init)
-        with torch.no_grad():
-            agent.policy.log_std.fill_(np.float64(-2.9))
-        agent.policy.log_std.requires_grad = False
 
     else:
         checkpoint_path = args_cli.checkpoint
         agent = AMPPPO.load(checkpoint_path, env, print_system_info=True)
 
+    with torch.no_grad():
+        agent.policy.log_std.fill_(np.float64(-2.9))
+    agent.policy.log_std.requires_grad = False
+
     new_logger = configure(log_dir, ["stdout", "tensorboard"])
     agent.set_logger(new_logger)
     print("[INFO]:agents loaded")
 
-    checkpoint_callback = CheckpointCallback(save_freq=5000, save_path=log_dir, name_prefix="model", verbose=2)
+    checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=log_dir, name_prefix="model", verbose=2)
     agent.learn(total_timesteps=n_timesteps, callback=checkpoint_callback)
     agent.save(os.path.join(log_dir, "model"))
 

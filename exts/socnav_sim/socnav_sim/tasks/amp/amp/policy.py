@@ -45,8 +45,9 @@ with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 
 num_envs = config['env']['num_envs'] # type: ignore
-global motion_load
-motion_load = MotionLoad(num_envs)
+if config['env']['task'] == 'Isaac-AMP': # type: ignore
+    global motion_load
+    motion_load = MotionLoad(num_envs)
 
 disc_coef = config['training']['disc_coef'] # type: ignore
 
@@ -116,7 +117,7 @@ class AMPDemoBuffer():
     
     def build_amp_obs_demo(self, motion_ids, motion_times0):
         # Compute observation for the motion starting point
-        dt = 1 / 30
+        dt = 1 / 120
         motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, self.num_amp_obs_steps])
 
         motion_times = motion_times0.unsqueeze(-1)
