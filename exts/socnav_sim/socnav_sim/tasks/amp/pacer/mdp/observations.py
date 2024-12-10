@@ -26,8 +26,8 @@ from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
     dof_subset,
     body_flip_left_to_right_index
 )
-# import socnav_sim.tasks.amp.amp_utils.utils.traj_generator as traj_generator
-from socnav_sim.tasks.amp.amp_utils.utils.traj_socnav import TrajSocnav
+import socnav_sim.tasks.amp.amp_utils.utils.traj_generator as traj_generator
+# from socnav_sim.tasks.amp.amp_utils.utils.traj_socnav import TrajSocnav
 import socnav_sim.tasks.amp.pacer.policy as policy
 import socnav_sim.tasks.amp.pacer.mdp.events as events
 from omni.isaac.lab.markers import VisualizationMarkersCfg, VisualizationMarkers
@@ -71,8 +71,8 @@ class ObsComputer():
         self._num_traj_samples = 10
         self._traj_sample_timestep = 0.5
         self._traj_gen_init = False
-        # self._traj_gen = None
-        # self.progress_buf = None
+        self._traj_gen = None
+        self.progress_buf = None
         self._has_upright_start = True
         self.height_meas_scale = 5
         self.num_height_points = 1024
@@ -86,7 +86,7 @@ class ObsComputer():
         self.num_samples_per_axis = 16
         self.height_sample_init_flag = False
     
-        self.traj_socnav = TrajSocnav(num_envs)
+        # self.traj_socnav = TrajSocnav(num_envs)
 
         self.amp_obs_buf = torch.zeros(
             (num_envs, 10, amp_obs_shape_step), device="cuda:0", dtype=torch.float)
@@ -151,50 +151,50 @@ class ObsComputer():
                                                     upright_config)
         return obs
     
-    # def _build_traj_generator(self, 
-    #                           env: ManagerBasedEnv, 
-    #                           asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
-    #     asset: Articulation = env.scene[asset_cfg.name]
+    def _build_traj_generator(self, 
+                              env: ManagerBasedEnv, 
+                              asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
+        asset: Articulation = env.scene[asset_cfg.name]
         
-    #     episode_dur = env.max_episode_length * env.physics_dt # type: ignore
-    #     num_verts = 101
-    #     dtheta_max = 2.0
-    #     self._traj_gen = traj_generator.TrajGenerator(env.num_envs, episode_dur, num_verts,
-    #                                                   env.device, dtheta_max,
-    #                                                   self._speed_min, self._speed_max,
-    #                                                   self._accel_max, self._sharp_turn_prob)
+        episode_dur = env.max_episode_length * env.physics_dt # type: ignore
+        num_verts = 101
+        dtheta_max = 2.0
+        self._traj_gen = traj_generator.TrajGenerator(env.num_envs, episode_dur, num_verts,
+                                                      env.device, dtheta_max,
+                                                      self._speed_min, self._speed_max,
+                                                      self._accel_max, self._sharp_turn_prob)
 
-    #     env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long)
-    #     root_pos = asset.data.root_pos_w[:, 0:3]
-    #     self._traj_gen.reset(env_ids, root_pos)
-    #     self.progress_buf = torch.zeros(env.num_envs, device=env.device, dtype=torch.long)
+        env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long)
+        root_pos = asset.data.root_pos_w[:, 0:3]
+        self._traj_gen.reset(env_ids, root_pos)
+        self.progress_buf = torch.zeros(env.num_envs, device=env.device, dtype=torch.long)
 
-    #     print(f"INFO: traj_gen init")
+        print(f"INFO: traj_gen init")
 
-    #     return
+        return
 
-    # def _fetch_traj_samples(self,
-    #                         env: ManagerBasedEnv):
-    #     # 5 seconds with 0.5 second intervals, 10 samples.
-    #     env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long) # type: ignore
+    def _fetch_traj_samples(self,
+                            env: ManagerBasedEnv):
+        # 5 seconds with 0.5 second intervals, 10 samples.
+        env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long) # type: ignore
 
-    #     timestep_beg = self.progress_buf[env_ids] * env.physics_dt # type: ignore
+        timestep_beg = self.progress_buf[env_ids] * env.physics_dt # type: ignore
         
-    #     # for local reward
-    #     global tar_pos
-    #     tar_pos = self._traj_gen.calc_pos(env_ids, timestep_beg) # type: ignore
+        # for local reward
+        global tar_pos
+        tar_pos = self._traj_gen.calc_pos(env_ids, timestep_beg) # type: ignore
         
-    #     self.progress_buf += 1 # type: ignore
-    #     timesteps = torch.arange(self._num_traj_samples, device=env.device, dtype=torch.float)
-    #     timesteps = timesteps * self._traj_sample_timestep
-    #     traj_timesteps = timestep_beg.unsqueeze(-1) + timesteps
+        self.progress_buf += 1 # type: ignore
+        timesteps = torch.arange(self._num_traj_samples, device=env.device, dtype=torch.float)
+        timesteps = timesteps * self._traj_sample_timestep
+        traj_timesteps = timestep_beg.unsqueeze(-1) + timesteps
 
-    #     env_ids_tiled = torch.broadcast_to(env_ids.unsqueeze(-1), traj_timesteps.shape)
+        env_ids_tiled = torch.broadcast_to(env_ids.unsqueeze(-1), traj_timesteps.shape)
 
-    #     traj_samples_flat = self._traj_gen.calc_pos(env_ids_tiled.flatten(), traj_timesteps.flatten()) # type: ignore
-    #     traj_samples = torch.reshape(traj_samples_flat, shape=(env_ids.shape[0], self._num_traj_samples, traj_samples_flat.shape[-1]))
+        traj_samples_flat = self._traj_gen.calc_pos(env_ids_tiled.flatten(), traj_timesteps.flatten()) # type: ignore
+        traj_samples = torch.reshape(traj_samples_flat, shape=(env_ids.shape[0], self._num_traj_samples, traj_samples_flat.shape[-1]))
 
-    #     return traj_samples
+        return traj_samples
 
     def compute_task_obs(self, 
                          env: ManagerBasedEnv, 
@@ -202,37 +202,37 @@ class ObsComputer():
                          ) -> torch.Tensor:
         asset: Articulation = env.scene[asset_cfg.name]
 
-        # if self._traj_gen_init == False:
-        #     self._traj_gen_init = True
-        #     self._build_traj_generator(env, asset_cfg)
+        if self._traj_gen_init == False:
+            self._traj_gen_init = True
+            self._build_traj_generator(env, asset_cfg)
 
-        # # for traj_reset
-        # root_pos = asset.data.root_pos_w[:, 0:3]
-        # if events.amp_obs_reset is True:
-        #     root_pos_reset = root_pos[events.amp_reset_env_ids, ...]
-        #     self._traj_gen.reset(events.amp_reset_env_ids, root_pos_reset) # type: ignore
-        #     self.progress_buf[events.amp_reset_env_ids] = 0 # type: ignore
-
-        # traj_samples = self._fetch_traj_samples(env)
-        # root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)
-        # obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)
-
-        # trajectory_marker.visualize(translations=traj_samples.reshape(-1, 3))
-        
+        # for traj_reset
         root_pos = asset.data.root_pos_w[:, 0:3]
-        root_rot = asset.data.root_quat_w
         if events.amp_obs_reset is True:
-            self.traj_socnav.reset_traj(root_rot, root_pos, events.amp_reset_env_ids)
+            root_pos_reset = root_pos[events.amp_reset_env_ids, ...]
+            self._traj_gen.reset(events.amp_reset_env_ids, root_pos_reset) # type: ignore
+            self.progress_buf[events.amp_reset_env_ids] = 0 # type: ignore
 
-        traj_samples = self.traj_socnav.traj_pos.unsqueeze(1).repeat(1, 10, 1)
+        traj_samples = self._fetch_traj_samples(env)
         root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)
-        obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)        
+        obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)
 
-        global tar_pos
-        tar_pos = traj_samples[:, 0, :]
+        trajectory_marker.visualize(translations=traj_samples.reshape(-1, 3))
+        
+        # root_pos = asset.data.root_pos_w[:, 0:3]
+        # root_rot = asset.data.root_quat_w
+        # if events.amp_obs_reset is True:
+        #     self.traj_socnav.reset_traj(root_rot, root_pos, events.amp_reset_env_ids)
 
-        self.traj_socnav.update()
-        trajectory_marker.visualize(translations=self.traj_socnav.traj_pos.reshape(-1, 3))
+        # traj_samples = self.traj_socnav.traj_pos.unsqueeze(1).repeat(1, 10, 1)
+        # root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)
+        # obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)        
+
+        # global tar_pos
+        # tar_pos = traj_samples[:, 0, :]
+
+        # self.traj_socnav.update()
+        # trajectory_marker.visualize(translations=self.traj_socnav.traj_pos.reshape(-1, 3))
 
         return obs
     

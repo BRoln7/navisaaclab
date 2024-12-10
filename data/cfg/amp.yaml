@@ -1,19 +1,21 @@
 # config.yaml
 
-#model:
-#  type: "PPO"
-#  hidden_size: 256
-#  activation: "relu"
-
 training:
   train: True
-  checkpoint: 'logs/sb3/Isaac-AMP/2024-11-30_20-18-50/model_348160000_steps.zip'
+  checkpoint: null
+  # checkpoint: 'logs/sb3/Isaac-Pacer/2024-12-10_11-31-43/2024-12-10_11-31-43'
+  # disc_checkpoint: 'logs/sb3/Isaac-Pacer/discriminator.pth'
+  # std_checkpoint: 'logs/sb3/Isaac-Pacer/amp_input_mean_std.pth'
+  # ampbuffer_checkpoint: '/home/social-navigation/data/amp_demo_buffer.pth'
+  # replaybuffer_checkpoint: '/home/social-navigation/data/amp_replay_buffer.pth'
   lr: 2e-5
   disc_coef: 5
   bound_loss: 10
-  # data_file: 'smpl_humanoid_walk_slow.pkl'
+  # data_file: 'amass_walk_run_isaac.pkl'
   data_file: 'amass_isaac_run_upright_slim.pkl'
+  # data_file: 'amass_walk_isaac.pkl'
 
 env:
-  num_envs: 4096
-  task: Isaac-AMP
+  num_envs: 3072
+  # task: Isaac-AMP
+  task: Isaac-Pacer

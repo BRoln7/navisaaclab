@@ -62,7 +62,7 @@ class Traj():
 
     def update(self, key:str):
         if key == 'fast':
-            step = 0.04
+            step = 0.025
         elif key == 'medium':
             step = 0.02
         else:
@@ -115,10 +115,10 @@ def reset_init_state(asset:Articulation):
 def reset_amp_motion(motion_ids, motion_times):
     dt = 1 / 120
 
-    motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, 10])
+    motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, 100])
     motion_times = motion_times.unsqueeze(-1)
 
-    time_steps = dt * (torch.arange(0, 10, device='cuda:0') + 1)
+    time_steps = dt * (torch.arange(0, 100, device='cuda:0') + 1)
     motion_times = motion_times + time_steps
 
     motion_ids = motion_ids.view(-1)
@@ -151,7 +151,7 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
             robot.write_root_velocity_to_sim(torch.cat([root_vel[i], root_ang_vel[i]], dim=0)) # type: ignore
             robot.write_joint_state_to_sim(position=dof_pos[:, dof_gym_to_sim][i],\
                                 velocity=dof_vel[:,dof_gym_to_sim][i]) # type: ignore
-            traj_visual.update('slow')
+            traj_visual.update('fast')
             sim.step()
             robot.update(sim_dt)
 

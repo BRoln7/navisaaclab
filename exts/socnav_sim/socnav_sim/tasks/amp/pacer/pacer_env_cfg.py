@@ -107,7 +107,7 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
     task_reward = RewTerm(mdp.compute_location_reward,
-                          weight=0.5)
+                          weight=0.0)
     power_reward = RewTerm(mdp.compute_power_reward,
                            weight=0.0)
     amp_reward = RewTerm(obs_computer.compute_amp_reward,
