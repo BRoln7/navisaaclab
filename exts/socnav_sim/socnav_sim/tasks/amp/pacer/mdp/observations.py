@@ -39,10 +39,10 @@ if TYPE_CHECKING:
 trajectory_cfg = VisualizationMarkersCfg(
     prim_path="/World/Visuals/TrajectoryMarkers",
     markers={
-        "marker": sim_utils.SphereCfg(
+        "waypoints": sim_utils.SphereCfg(
             radius=0.05,
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.5)),
-        ),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.5))
+        )
     }
 )
 trajectory_marker = VisualizationMarkers(trajectory_cfg)
@@ -58,6 +58,8 @@ motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'amp.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 num_envs = config['env']['num_envs'] # type: ignore
+
+record_amp_state = []
 
 #########################################################################################
 ##################################### function for obs ################################## 
@@ -156,7 +158,7 @@ class ObsComputer():
                               asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
         asset: Articulation = env.scene[asset_cfg.name]
         
-        episode_dur = env.max_episode_length * env.physics_dt # type: ignore
+        episode_dur = env.max_episode_length * env.physics_dt * 4 # type: ignore
         num_verts = 101
         dtheta_max = 2.0
         self._traj_gen = traj_generator.TrajGenerator(env.num_envs, episode_dur, num_verts,
@@ -327,6 +329,15 @@ class ObsComputer():
             self.dof_subset, 
             self._local_root_obs, self._amp_root_height_obs, self._has_dof_subset, self._has_upright_start)
 
+        ##############################################
+        amp_state = torch.cat([spine_body_pos, spine_body_rot, 
+                               spine_body_vel, spine_body_ang_vel,
+                               joint_pos, joint_vel], dim=1).to('cuda:0')
+        record_amp_state.append(amp_state)
+        if len(record_amp_state) > 100:
+            final_record_amp_state = torch.stack(record_amp_state, dim=0)
+            torch.save(final_record_amp_state, 'record_amp_state.pt')
+
         # events reset
         if events.amp_obs_reset is True:
             self.reset_amp_obs(events.amp_reset_env_ids,
@@ -352,7 +363,7 @@ class ObsComputer():
         return reward
         
     def reset_amp_obs(self, env_ids, motion_ids, motion_times, env: ManagerBasedEnv):
-        dt = 1 / 120
+        dt = 1 / 30
 
         motion_ids = motion_ids[env_ids]
         motion_times = motion_times[env_ids]

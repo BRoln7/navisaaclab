@@ -99,21 +99,21 @@ def reset_init_state(asset:Articulation):
     # reset dof pose
     wxyz_to_xyzw = [3, 0, 1, 2]
     motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, \
-      root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = motion_load.sample_ref_state(1)
+      root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = motion_load.viusual_from_start(1)
     asset.write_root_pose_to_sim(torch.cat([root_pos, root_rot[:, wxyz_to_xyzw]], dim=-1))
     asset.write_root_velocity_to_sim(torch.cat([root_vel, root_ang_vel], dim=-1))
     asset.write_joint_state_to_sim(position=dof_pos[:,dof_gym_to_sim],\
                                     velocity=dof_vel[:,dof_gym_to_sim])
     
-    traj_visual.traj_pos = torch.tensor([[root_pos[..., 0], root_pos[..., 1], 0.0]]).to('cuda:0')
-    traj_visual.reset_traj(root_rot)
-    traj_visual.traj_marker.visualize(translations=traj_visual.traj_pos)
+    # traj_visual.traj_pos = torch.tensor([[root_pos[..., 0], root_pos[..., 1], 0.0]]).to('cuda:0')
+    # traj_visual.reset_traj(root_rot)
+    # traj_visual.traj_marker.visualize(translations=traj_visual.traj_pos)
     
     return motion_ids, motion_times
 
 
 def reset_amp_motion(motion_ids, motion_times):
-    dt = 1 / 120
+    dt = 1 / 30
 
     motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, 100])
     motion_times = motion_times.unsqueeze(-1)
@@ -136,6 +136,26 @@ def reset_amp_motion(motion_ids, motion_times):
     return root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel
     
 
+# def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articulation], origins: torch.Tensor):
+#     """Runs the simulation loop."""
+#     robot = entities["amp"]
+#     sim_dt = 1 / 120
+#     wxyz_to_xyzw = [3, 0, 1, 2]
+#     while simulation_app.is_running():
+#         amp_record_state = torch.load('record_amp_state.pt')
+#         # motion_ids, motion_times = reset_init_state(robot)
+#         robot.reset()
+#         print("[INFO]: Resetting robot state...")
+#         # root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel = reset_amp_motion(motion_ids, motion_times)
+#         for i in range(amp_record_state.size(0)):
+#             robot.write_root_pose_to_sim(torch.cat([amp_record_state[i,0,:3], amp_record_state[i,0,3:7][wxyz_to_xyzw]], dim=-1)) # type: ignore
+#             robot.write_root_velocity_to_sim(torch.cat([amp_record_state[i,0,7:10], amp_record_state[i,0,10:13]], dim=0)) # type: ignore
+#             robot.write_joint_state_to_sim(position=amp_record_state[i,0,13:82][dof_gym_to_sim],\
+#                                 velocity=amp_record_state[i,0,82:151][dof_gym_to_sim]) # type: ignore
+#             # traj_visual.update('fast')
+#             sim.step()
+#             robot.update(sim_dt)
+
 def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articulation], origins: torch.Tensor):
     """Runs the simulation loop."""
     robot = entities["amp"]
@@ -151,7 +171,7 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
             robot.write_root_velocity_to_sim(torch.cat([root_vel[i], root_ang_vel[i]], dim=0)) # type: ignore
             robot.write_joint_state_to_sim(position=dof_pos[:, dof_gym_to_sim][i],\
                                 velocity=dof_vel[:,dof_gym_to_sim][i]) # type: ignore
-            traj_visual.update('fast')
+            # traj_visual.update('fast')
             sim.step()
             robot.update(sim_dt)
 

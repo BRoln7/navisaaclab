@@ -109,7 +109,7 @@ class AMPDemoBuffer():
     
     def build_amp_obs_demo(self, motion_ids, motion_times0):
         # Compute observation for the motion starting point
-        dt = 1 / 120
+        dt = 1 / 30
         motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, self.num_amp_obs_steps])
 
         motion_times = motion_times0.unsqueeze(-1)
@@ -388,10 +388,16 @@ class AMPPPO(PPO):
                 s_info = self.sym_loss(flip_obs_batch, orig_obs_batch)
                 s_loss = s_info['sym_loss']
                 s_loss = torch.mean(s_loss)
-                s_loss = s_loss * self.sym_loss_coef
                 sym_loss.append(s_loss.cpu().detach().numpy())
+                ##################################################################
+                ##################### from here bound loss #######################
+                ##################################################################
+                mu = self.policy(rollout_data.observations)
+                b_loss = self.bound_loss(mu[0])
+                b_loss = torch.mean(b_loss)
 
-                loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss + s_loss
+                loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss +\
+                      self.sym_loss_coef * s_loss + self.bounds_loss_coef * b_loss
 
                 with torch.no_grad():
                     log_ratio = log_prob - rollout_data.old_log_prob
@@ -491,7 +497,6 @@ class AMPPPO(PPO):
 
         torch.save(self.amp_demo_buffer, "/home/social-navigation/data/amp_demo_buffer.pth")
         torch.save(self.amp_replay_buffer, "/home/social-navigation/data/amp_replay_buffer.pth")
-
 
     def _disc_loss_neg(self, disc_logits):
         bce = torch.nn.BCEWithLogitsLoss()

@@ -117,7 +117,7 @@ class AMPDemoBuffer():
     
     def build_amp_obs_demo(self, motion_ids, motion_times0):
         # Compute observation for the motion starting point
-        dt = 1 / 120
+        dt = 1 / 30
         motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, self.num_amp_obs_steps])
 
         motion_times = motion_times0.unsqueeze(-1)
