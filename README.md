@@ -62,19 +62,18 @@ To setup the IDE, please follow these instructions:
 
 If everything executes correctly, it should create a file .python.env in the `.vscode` directory. The file contains the python paths to all the extensions provided by Isaac Sim and Omniverse. This helps in indexing all the python modules for intelligent suggestions while writing code.
 
+### amass motion capture datasets
+
+for training: https://drive.google.com/file/d/15d5ZKOpKIN-rVguq-EsAk5oTX_YDoHdy/view?usp=sharing
+for inference: https://drive.google.com/file/d/1f3ORB2xZROVRCvLcB6gizpgVeY1H3itO/view?usp=sharing
+
 ### Training scene
 ![training for amp](./assets/walk_results.gif "training for amp")
 ![training for amp](./assets/pacer_motion_results.gif "training for amp")
 
-### motion visualization
-
-##### amass walk motion
+### amass motion visualization
 ![amass walk motion](./assets/amass_motion_walk.gif "amass walk motion")
-
-##### Hold the wall while walking
 ![Hold the wall while walking](./assets/amass_motion_visual.gif "Hold the wall while walking")
-
-
 
 ### Inference phase
 ./isaaclab.sh -p -m tensorboard.main --logdir logs/sb3/task...
