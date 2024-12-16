@@ -41,7 +41,7 @@ def fbx_to_array(fbx_file_path, fbx_configs, root_joint, fps):
     fbx_file_path = os.path.abspath(fbx_file_path)
     assert os.path.exists(fbx_file_path)
 
-    # Switch directories to the utils folder to ensure the reading works
+    # Switch directories to the env_utils folder to ensure the reading works
     previous_cwd = os.getcwd()
     os.chdir(current_folder)
 

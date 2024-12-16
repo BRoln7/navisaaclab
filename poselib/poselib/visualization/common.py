@@ -186,4 +186,3 @@ def plot_skeleton_motion_interactive_multiple(*callables, sync=True):
 
 
 # def plot_skeleton_motion_interactive_multiple_same(skeleton_motions, task_name=""):
-

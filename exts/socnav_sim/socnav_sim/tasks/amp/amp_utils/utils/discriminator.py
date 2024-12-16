@@ -9,6 +9,15 @@ motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'amp.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 
+DISC_LOGIT_INIT_SCALE = 1.0
+
+
+seed = 0
+torch.manual_seed(seed)
+os.environ['PYTHONHASHSEED'] = str(seed)
+torch.cuda.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+
 class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
@@ -21,7 +30,10 @@ class Discriminator(nn.Module):
         
         self.disc_logit = nn.Linear(512, 1)
 
-        self.optimizer = Adam(self.parameters(), lr=2e-5)
+        torch.nn.init.uniform_(self.disc_logit.weight, -DISC_LOGIT_INIT_SCALE, DISC_LOGIT_INIT_SCALE)
+        torch.nn.init.zeros_(self.disc_logit.bias)
+
+        self.optimizer = Adam(self.parameters(), lr=2e-5, eps=1e-08, weight_decay=0.0)
 
     def forward(self, obs):
         disc_obs = self.disc_mlp(obs)
@@ -37,7 +49,7 @@ class Discriminator(nn.Module):
         disc_obs = self.disc_mlp(obs)
         disc_logits = self.disc_logit(disc_obs)
 
-        return disc_logits       
+        return disc_logits
     
 def bias_init(module):
     mlp_init = torch.nn.Identity()

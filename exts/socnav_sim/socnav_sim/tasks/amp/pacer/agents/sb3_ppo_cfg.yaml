@@ -2,7 +2,7 @@
 seed: 0
 
 policy: 'MlpPolicy'
-n_timesteps: !!float 5e8
+n_timesteps: !!float 5e10
 batch_size: 1024
 n_steps: 32
 gamma: 0.99

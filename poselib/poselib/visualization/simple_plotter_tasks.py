@@ -189,4 +189,3 @@ class Draw3DTrail(DrawXDTrail):
     @property
     def dim(self):
         return 3
-

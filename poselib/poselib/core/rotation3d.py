@@ -123,7 +123,7 @@ def quat_identity(shape: List[int]):
 
 @torch.jit.script
 def quat_from_angle_axis(angle, axis, degree: bool = False):
-    """ Create a 3D rotation from angle and axis of rotation. The rotation is counter-clockwise 
+    """Create a 3D rotation from angle and axis of rotation. The rotation is counter-clockwise
     along the axis.
 
     The rotation can be interpreted as a_R_b where frame "b" is the new frame that
@@ -151,7 +151,7 @@ def quat_from_rotation_matrix(m):
     Construct a 3D rotation from a valid 3x3 rotation matrices.
     Reference can be found here:
     http://www.cg.info.hiroshima-cu.ac.jp/~miyazaki/knowledge/teche52.html
-c
+
     :param m: 3x3 orthogonal rotation matrices.
     :type m: Tensor
 
@@ -289,7 +289,6 @@ def transform_identity(shape: List[int]):
     return transform_from_rotation_translation(r, t)
 
 
-
 @torch.jit.script
 def transform_rotation(x):
     """Get rotation from transform"""
@@ -382,15 +381,15 @@ def rot_matrix_from_quaternion(q):
     qi, qj, qk, qr = q[..., 0], q[..., 1], q[..., 2], q[..., 3]
 
     # Set individual elements
-    R00 = 1.0 - 2.0 * (qj ** 2 + qk ** 2)
+    R00 = 1.0 - 2.0 * (qj**2 + qk**2)
     R01 = 2 * (qi * qj - qk * qr)
     R02 = 2 * (qi * qk + qj * qr)
     R10 = 2 * (qi * qj + qk * qr)
-    R11 = 1.0 - 2.0 * (qi ** 2 + qk ** 2)
+    R11 = 1.0 - 2.0 * (qi**2 + qk**2)
     R12 = 2 * (qj * qk - qi * qr)
     R20 = 2 * (qi * qk - qj * qr)
     R21 = 2 * (qj * qk + qi * qr)
-    R22 = 1.0 - 2.0 * (qi ** 2 + qj ** 2)
+    R22 = 1.0 - 2.0 * (qi**2 + qj**2)
 
     R0 = torch.stack([R00, R01, R02], dim=-1)
     R1 = torch.stack([R10, R11, R12], dim=-1)
@@ -399,6 +398,38 @@ def rot_matrix_from_quaternion(q):
     R = torch.stack([R0, R1, R2], dim=-2)
 
     return R
+
+
+# @torch.jit.script
+# def rot_matrix_from_quaternion(quaternions: torch.Tensor) -> torch.Tensor:
+#     """
+#     Convert rotations given as quaternions to rotation matrices.
+#
+#     Args:
+#         quaternions: quaternions with real part first,
+#             as tensor of shape (..., 4).
+#
+#     Returns:
+#         Rotation matrices as tensor of shape (..., 3, 3).
+#     """
+#     i, j, k, r = torch.unbind(quaternions, -1)
+#     two_s = 2.0 / (quaternions * quaternions).sum(-1)
+#
+#     o = torch.stack(
+#         (
+#             1 - two_s * (j * j + k * k),
+#             two_s * (i * j - k * r),
+#             two_s * (i * k + j * r),
+#             two_s * (i * j + k * r),
+#             1 - two_s * (i * i + k * k),
+#             two_s * (j * k - i * r),
+#             two_s * (i * k - j * r),
+#             two_s * (j * k + i * r),
+#             1 - two_s * (i * i + j * j),
+#         ),
+#         -1,
+#     )
+#     return o.reshape(quaternions.shape[:-1] + (3, 3))
 
 
 @torch.jit.script
@@ -447,4 +478,3 @@ def euclidean_to_transform(transformation_matrix):
         ),
         t=euclidean_translation(transformation_matrix),
     )
-

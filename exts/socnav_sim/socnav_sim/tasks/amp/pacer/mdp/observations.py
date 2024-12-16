@@ -59,8 +59,6 @@ with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 num_envs = config['env']['num_envs'] # type: ignore
 
-record_amp_state = []
-
 #########################################################################################
 ##################################### function for obs ################################## 
 #########################################################################################
@@ -158,7 +156,7 @@ class ObsComputer():
                               asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
         asset: Articulation = env.scene[asset_cfg.name]
         
-        episode_dur = env.max_episode_length * env.physics_dt * 4 # type: ignore
+        episode_dur = env.max_episode_length * env.physics_dt * 16.0 # type: ignore
         num_verts = 101
         dtheta_max = 2.0
         self._traj_gen = traj_generator.TrajGenerator(env.num_envs, episode_dur, num_verts,
@@ -180,7 +178,7 @@ class ObsComputer():
         # 5 seconds with 0.5 second intervals, 10 samples.
         env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long) # type: ignore
 
-        timestep_beg = self.progress_buf[env_ids] * env.physics_dt # type: ignore
+        timestep_beg = self.progress_buf[env_ids] * env.physics_dt * 1.0 # type: ignore
         
         # for local reward
         global tar_pos
@@ -220,21 +218,6 @@ class ObsComputer():
         obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)
 
         trajectory_marker.visualize(translations=traj_samples.reshape(-1, 3))
-        
-        # root_pos = asset.data.root_pos_w[:, 0:3]
-        # root_rot = asset.data.root_quat_w
-        # if events.amp_obs_reset is True:
-        #     self.traj_socnav.reset_traj(root_rot, root_pos, events.amp_reset_env_ids)
-
-        # traj_samples = self.traj_socnav.traj_pos.unsqueeze(1).repeat(1, 10, 1)
-        # root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)
-        # obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)        
-
-        # global tar_pos
-        # tar_pos = traj_samples[:, 0, :]
-
-        # self.traj_socnav.update()
-        # trajectory_marker.visualize(translations=self.traj_socnav.traj_pos.reshape(-1, 3))
 
         return obs
     
@@ -329,15 +312,6 @@ class ObsComputer():
             self.dof_subset, 
             self._local_root_obs, self._amp_root_height_obs, self._has_dof_subset, self._has_upright_start)
 
-        ##############################################
-        amp_state = torch.cat([spine_body_pos, spine_body_rot, 
-                               spine_body_vel, spine_body_ang_vel,
-                               joint_pos, joint_vel], dim=1).to('cuda:0')
-        record_amp_state.append(amp_state)
-        if len(record_amp_state) > 100:
-            final_record_amp_state = torch.stack(record_amp_state, dim=0)
-            torch.save(final_record_amp_state, 'record_amp_state.pt')
-
         # events reset
         if events.amp_obs_reset is True:
             self.reset_amp_obs(events.amp_reset_env_ids,
@@ -352,6 +326,8 @@ class ObsComputer():
         self.hist_amp_obs_buf = self.amp_obs_buf[:, 0:9]
 
         # calculate amp reward
+        policy.amp_input_mean_std.eval()
+        policy.discriminator.eval()
         norm_amp_obs = policy.amp_input_mean_std(self.amp_obs_buf.reshape(num_envs, -1))
         amp_reward = policy.discriminator(norm_amp_obs).squeeze(1)
         reward = amp_reward.clone().detach()

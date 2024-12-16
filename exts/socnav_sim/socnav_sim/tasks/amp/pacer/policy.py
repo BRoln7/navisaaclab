@@ -145,7 +145,6 @@ class AMPDemoBuffer():
     def sample(self, num_samples):
         return self._amp_obs_demo_buffer.sample(num_samples)
 
-
 ################################################################
 ################### discriminator network ######################
 ################################################################
@@ -155,17 +154,17 @@ if config['training']['checkpoint'] is None: # type: ignore
     discriminator = Discriminator()
     bias_init(discriminator)
     amp_input_mean_std = RunningMeanStd(1950).to("cuda:0")
+
 elif config['training']['train'] == True: # type: ignore
     discriminator = torch.load(config['training']['disc_checkpoint']) # type: ignore
     amp_input_mean_std = torch.load(config['training']['std_checkpoint']) # type: ignore
+
 else: 
     discriminator = Discriminator()
     bias_init(discriminator)
     amp_input_mean_std = RunningMeanStd(1950).to("cuda:0")
 
 discriminator.to("cuda:0")
-discriminator.train()
-amp_input_mean_std.train()
 ################################################################
 ########################## AMP PPO #############################
 ################################################################
@@ -181,10 +180,6 @@ class AMPPPO(PPO):
         self.amp_replay_buffer = ReplayBuffer(amp_demo_buffer_size, "cuda:0")
         # flip obs buffer
         self.flip_obs_buffer = torch.tensor([]).to("cuda:0")
-
-        if config['training']['checkpoint'] is not None and config['training']['train']: # type: ignore
-            self.amp_demo_buffer = torch.load(config['training']['ampbuffer_checkpoint']) # type: ignore
-            self.amp_replay_buffer = torch.load(config['training']['replaybuffer_checkpoint']) # type: ignore
 
         self._amp_replay_keep_prob = 0.01
         self._disc_logit_reg = 0.01
@@ -322,6 +317,7 @@ class AMPPPO(PPO):
 
         entropy_losses = []
         pg_losses, value_losses = [], []
+        a_losses = []
         clip_fractions = []
         sym_loss = []
 
@@ -399,6 +395,8 @@ class AMPPPO(PPO):
                 loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss +\
                       self.sym_loss_coef * s_loss + self.bounds_loss_coef * b_loss
 
+                a_losses.append(policy_loss.cpu().detach().numpy())
+
                 with torch.no_grad():
                     log_ratio = log_prob - rollout_data.old_log_prob
                     approx_kl_div = torch.mean((torch.exp(log_ratio) - 1) - log_ratio).cpu().numpy()
@@ -421,38 +419,47 @@ class AMPPPO(PPO):
 
         explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
 
-        self.logger.record("train/entropy_loss", np.mean(entropy_losses))
-        self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
+        self.logger.record("train/a_loss", np.mean(a_losses))
         self.logger.record("train/value_loss", np.mean(value_losses))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
         self.logger.record("train/clip_fraction", np.mean(clip_fractions))
         self.logger.record("train/loss", loss.item())
         self.logger.record("train/explained_variance", explained_var)
         self.logger.record("train/sym_loss", np.mean(sym_loss))
-        if hasattr(self.policy, "log_std"):
-            self.logger.record("train/std", torch.exp(self.policy.log_std).mean().item())
         self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
-        self.logger.record("train/clip_range", clip_range)
         if self.clip_range_vf is not None:
             self.logger.record("train/clip_range_vf", clip_range_vf)
         
         ##################################################################
         ######################## from here amp ###########################
         ##################################################################
+        amp_input_mean_std.train()
+        discriminator.train()
+        # amp_obs
         amp_obs = self.amp_buffer.reshape(-1, 1950)
         amp_obs = amp_input_mean_std(amp_obs)
-
+        # amp_replay_obs
         num_obs_samples = self.amp_buffer.shape[0] * self.amp_buffer.shape[1]
         self._store_replay_amp_obs(self.amp_buffer.reshape(-1, self.amp_buffer.shape[2]))
-        amp_obs_replay = self.amp_demo_buffer.sample(num_obs_samples)['amp_obs']
+        amp_obs_replay = self.amp_replay_buffer.sample(num_obs_samples)['amp_obs']
         amp_obs_replay = amp_input_mean_std(amp_obs_replay)
-
+        # amp_demo_obs
         self.amp_demo_buffer.update_amp_demos()
         amp_obs_demo = self.amp_demo_buffer.sample(num_obs_samples)['amp_obs']
         amp_obs_demo = amp_input_mean_std(amp_obs_demo)
+        # drop out
+        dropout_mask = self.get_dropout_mask(amp_obs)
+        amp_obs = self.dropout_amp_obs(amp_obs, dropout_mask[..., 0])
+        amp_obs_replay = self.dropout_amp_obs(amp_obs_replay, dropout_mask[..., 1])
+        amp_obs_demo = self.dropout_amp_obs(amp_obs_demo, dropout_mask[..., 2])
+        del dropout_mask
+        torch.cuda.empty_cache()
 
-        disc_loss_total = torch.zeros(1).to("cuda:0").requires_grad_(False)
-        times = 0
+        disc_loss_record = []
+        disc_agent_logit_record = []
+        disc_demo_logit_record = []
+        disc_grad_penalty_record = []
+        disc_logit_loss_record = []
         for epoch in range(self.n_epochs):
             optim_times = math.ceil(self.amp_buffer.shape[0] * self.amp_buffer.shape[1] / self.batch_size)
             for mini_batch in range(optim_times):
@@ -466,21 +473,30 @@ class AMPPPO(PPO):
                 disc_demo_logit = discriminator.get_logit(amp_obs_demo_batch)
 
                 disc_agent_cat_logit = torch.cat([disc_agent_logit, disc_agent_replay_logit], dim=0)
-                disc_loss = self._disc_loss(disc_agent_cat_logit, disc_demo_logit, amp_obs_demo_batch)
-                disc_loss =  disc_coef * disc_loss
+                disc_info = self._disc_loss(disc_agent_cat_logit, disc_demo_logit, amp_obs_demo_batch)
+                disc_loss = disc_coef * disc_info['disc_loss']
 
                 discriminator.optimizer.zero_grad()
                 disc_loss.backward(retain_graph=False)
                 discriminator.optimizer.step()
 
-                disc_loss_total += disc_loss.detach()
-                times += 1
+                # record
+                disc_loss_record.append(disc_loss.cpu().detach().numpy())
+                disc_grad_penalty_record.append(disc_info['disc_grad_penalty'])
+                disc_logit_loss_record.append(disc_info['disc_logit_loss'])
+                disc_demo_logit_record.append(np.mean(disc_demo_logit.cpu().detach().numpy()))
+                disc_agent_logit_record.append(np.mean(disc_agent_logit.cpu().detach().numpy()))
 
         del amp_obs, amp_obs_replay, amp_obs_demo
+        self.logger.record("train/disc_loss", np.mean(disc_loss_record))
+        self.logger.record("train/disc_demo_logit", np.mean(disc_demo_logit_record))
+        self.logger.record("train/disc_agent_logit", np.mean(disc_agent_logit_record))  
+        self.logger.record("train/disc_grad_penalty", np.mean(disc_grad_penalty_record))  
+        self.logger.record("train/disc_logit_loss", np.mean(disc_logit_loss_record))  
+        del disc_loss_record, disc_demo_logit_record, disc_agent_logit_record, \
+            disc_grad_penalty_record, disc_logit_loss_record
         torch.cuda.empty_cache()
         gc.collect()
-        disc_loss_avg = disc_loss_total / times
-        self.logger.record("train/disc_loss", disc_loss_avg.item())
 
     def save(
         self,
@@ -562,7 +578,14 @@ class AMPPPO(PPO):
             disc_weight_decay = torch.sum(torch.square(disc_weights))
             disc_loss += self._disc_weight_decay * disc_weight_decay
 
-        return disc_loss
+        disc_info = {
+            'disc_loss': disc_loss,
+            'disc_grad_penalty': disc_grad_penalty.cpu().detach().numpy(),
+            'disc_logit_loss': disc_logit_loss.cpu().detach().numpy(),
+            'disc_agent_logit': disc_agent_logit.cpu().detach().numpy(),
+            'disc_demo_logit': disc_demo_logit.cpu().detach().numpy()
+        }
+        return disc_info
 
     def bound_loss(self, mu):
         soft_bound = 1.0
@@ -590,3 +613,48 @@ class AMPPPO(PPO):
         # import ipdb; ipdb.set_trace()
         sym_loss = sym_loss.pow(2).mean(dim = -1) * 50
         return {'sym_loss': sym_loss}
+
+    
+    def dropout_amp_obs(self, amp_obs, dropout_mask):
+        return amp_obs * dropout_mask
+
+    def get_dropout_mask(self,
+                            amp_obs,
+                            steps=10,
+                            num_masks=3,
+                            dropout_rate=0.3):
+        # ZL Hack: amp_obs_dims, should drop out whole joints
+        # [root_rot 6, root_vel 3, root_ang_vel 3, dof_pos 23 * 6 - 4 * 6, dof_vel 69 - 12, key_body_pos 3 * 4, shape_obs_disc 11]
+        # [root_rot 6, root_vel 3, root_ang_vel 3, dof_pos 23 * 6 - 4 * 6, dof_vel 69 - 12, key_body_pos 3 * 4, shape_obs_disc 47]
+        # 6 + 3 + 3 + 19 * 6 + 19 * 3 + 3 * 4 + 11 = 206 # normal with betas
+        # 6 + 3 + 3 + 19 * 6 + 19 * 3 + 3 * 4 + 10 = 205 # concise limb weight
+        # 6 + 3 + 3 + 19 * 6 + 19 * 3 + 3 * 4 + 59 = 254 # masterfoot
+        B, F = amp_obs.shape
+        B, _, amp_f = amp_obs.view(B, steps, -1).shape
+        masterfoot, remove_neck = False, False
+        try:
+            assert (F / steps == 205 or F / steps == 254 or F / steps == 242 or F / steps == 206 or F / steps == 197 or F / steps == 188 or F / steps == 187 or F / steps == 195 or F / steps == 196 or F / steps == 207)
+        except:
+            print(F/steps)
+            import ipdb; ipdb.set_trace()
+            print(F/steps)
+
+        dof_joints_offset = 12  # 6 + 3 + 3
+        num_joints = 19
+
+        if F / steps == 197:  # Remove neck
+            num_joints = 18
+        elif F / steps == 188:  # Remove hands
+            num_joints = 17
+        elif F / steps == 196 or F / steps == 207:
+            dof_joints_offset = 13  # 1 + 6 + 3 + 3
+
+        dof_vel_offsets = dof_joints_offset + num_joints * 6  # 12 + 19 * 6
+
+        dropout_mask = torch.ones([B, amp_f, num_masks])
+
+        for idx_joint in range(num_joints):
+            has_drop_out = torch.rand(B, num_masks) > dropout_rate
+            dropout_mask[:, dof_joints_offset + idx_joint * 6:dof_joints_offset + idx_joint * 6 + 6, :] = has_drop_out[:, None]
+            dropout_mask[:, dof_vel_offsets + idx_joint * 3:dof_vel_offsets + idx_joint * 3 + 3, :] = has_drop_out[:, None]
+        return dropout_mask.repeat(1, steps, 1).to(amp_obs)

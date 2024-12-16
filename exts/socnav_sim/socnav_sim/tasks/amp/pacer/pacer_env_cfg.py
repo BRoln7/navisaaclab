@@ -106,9 +106,9 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
     task_reward = RewTerm(mdp.compute_location_reward,
-                          weight=0.0)
+                          weight=0.5)
     power_reward = RewTerm(mdp.compute_power_reward,
-                           weight=0.0)
+                           weight=0.5)
     amp_reward = RewTerm(obs_computer.compute_amp_reward,
                          weight=1.0)
 
@@ -134,7 +134,7 @@ class PacerEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the MuJoCo-style Humanoid walking environment."""
 
     # Scene settings
-    scene: PacerSceneCfg = PacerSceneCfg(num_envs=8, env_spacing=10)
+    scene: PacerSceneCfg = PacerSceneCfg(num_envs=8, env_spacing=6)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()

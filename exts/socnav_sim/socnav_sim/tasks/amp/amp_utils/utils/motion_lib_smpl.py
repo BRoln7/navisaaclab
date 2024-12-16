@@ -318,7 +318,7 @@ class MotionLib():
                                        dtype=torch.float32)
         self._motion_num_frames = torch.tensor(self._motion_num_frames,
                                                device=self._device)
-        self._motion_limb_weights = torch.tensor(limb_weights,
+        self._motion_limb_weights = torch.tensor(limb_weights.clone().detach(),
                                                 device=self._device,
                                                 dtype=torch.float32)
         self._num_motions = len(motions)
