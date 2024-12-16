@@ -62,6 +62,12 @@ To setup the IDE, please follow these instructions:
 
 If everything executes correctly, it should create a file .python.env in the `.vscode` directory. The file contains the python paths to all the extensions provided by Isaac Sim and Omniverse. This helps in indexing all the python modules for intelligent suggestions while writing code.
 
+### Robots
+
+#### agile scout mini
+
+![scout mini](./assets/scout_mini.png "scout mini")
+
 ### amass motion capture datasets
 
 for training: https://drive.google.com/file/d/15d5ZKOpKIN-rVguq-EsAk5oTX_YDoHdy/view?usp=sharing
