@@ -109,6 +109,8 @@ class RewardsCfg:
                           weight=0.5)
     power_reward = RewTerm(mdp.compute_power_reward,
                            weight=0.5)
+    direction_reward = RewTerm(mdp.compute_direction_reward,
+                           weight=0.5)
     amp_reward = RewTerm(obs_computer.compute_amp_reward,
                          weight=1.0)
 

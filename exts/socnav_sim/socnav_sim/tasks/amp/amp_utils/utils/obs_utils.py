@@ -354,3 +354,24 @@ def get_height_maps_jit(
         ).clone()
 
     return heights.view(num_envs, -1).clone()
+
+import torch
+
+
+def find_envs_with_traj_back(robots_quaternions, robots_positions, points_positions):
+
+    w, x, y, z = robots_quaternions[:, 0], robots_quaternions[:, 1], robots_quaternions[:, 2], robots_quaternions[:, 3]
+    
+    R = torch.stack([
+        torch.stack([1 - 2 * (y**2 + z**2), 2 * (x * y - w * z), 2 * (x * z + w * y)], dim=-1),
+        torch.stack([2 * (x * y + w * z), 1 - 2 * (x**2 + z**2), 2 * (y * z - w * x)], dim=-1),
+        torch.stack([2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x**2 + y**2)], dim=-1),
+    ], dim=1)
+    
+    relative_positions = points_positions - robots_positions
+
+    local_positions = torch.bmm(R.transpose(1, 2), relative_positions.unsqueeze(-1)).squeeze(-1)
+
+    behind_indices = torch.where(local_positions[:, 0] <= 0)[0]
+
+    return behind_indices

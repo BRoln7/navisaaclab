@@ -7,6 +7,7 @@ from socnav_sim.tasks.amp.amp_utils.utils.rewards_utils import (
 )
 import socnav_sim.tasks.amp.pacer.mdp.observations as obs
 power_coefficient = 0.0005
+direction_coefficient = 1.0
 
 def compute_location_reward(env: ManagerBasedEnv, 
                             asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
@@ -32,3 +33,14 @@ def compute_power_reward(env: ManagerBasedEnv,
 
     return power_reward
 
+def compute_direction_reward(env: ManagerBasedEnv, 
+                         asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+                    ) -> torch.Tensor:
+    asset: Articulation = env.scene[asset_cfg.name]
+
+    forward_vel = asset.data.root_lin_vel_b[..., 0]
+    direct_vel = torch.abs(torch.minimum(torch.zeros(env.num_envs, device='cuda:0').float(), forward_vel))
+    direction_reward = -(torch.exp(direct_vel/direction_coefficient) -\
+                          torch.ones(env.num_envs, device='cuda:0').float())
+
+    return direction_reward

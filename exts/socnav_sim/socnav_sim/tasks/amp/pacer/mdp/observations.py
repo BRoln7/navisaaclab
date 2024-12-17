@@ -21,13 +21,13 @@ from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
     compute_location_observations,
     build_amp_observations_smpl,
     get_height_maps_jit,
+    # find_envs_with_traj_back,
     dof_sim_to_gym,
     body_sim_to_gym,
     dof_subset,
     body_flip_left_to_right_index
 )
 import socnav_sim.tasks.amp.amp_utils.utils.traj_generator as traj_generator
-# from socnav_sim.tasks.amp.amp_utils.utils.traj_socnav import TrajSocnav
 import socnav_sim.tasks.amp.pacer.policy as policy
 import socnav_sim.tasks.amp.pacer.mdp.events as events
 from omni.isaac.lab.markers import VisualizationMarkersCfg, VisualizationMarkers
@@ -86,7 +86,8 @@ class ObsComputer():
         self.num_samples_per_axis = 16
         self.height_sample_init_flag = False
     
-        # self.traj_socnav = TrajSocnav(num_envs)
+        # self.back_traj_indexs = torch.tensor([], device='cuda:0')
+        # self.back_traj_refer_points = torch.tensor([], device='cuda:0')
 
         self.amp_obs_buf = torch.zeros(
             (num_envs, 10, amp_obs_shape_step), device="cuda:0", dtype=torch.float)
@@ -156,7 +157,7 @@ class ObsComputer():
                               asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
         asset: Articulation = env.scene[asset_cfg.name]
         
-        episode_dur = env.max_episode_length * env.physics_dt * 16.0 # type: ignore
+        episode_dur = env.max_episode_length * env.physics_dt * 1.0 # type: ignore
         num_verts = 101
         dtheta_max = 2.0
         self._traj_gen = traj_generator.TrajGenerator(env.num_envs, episode_dur, num_verts,
@@ -184,7 +185,6 @@ class ObsComputer():
         global tar_pos
         tar_pos = self._traj_gen.calc_pos(env_ids, timestep_beg) # type: ignore
         
-        self.progress_buf += 1 # type: ignore
         timesteps = torch.arange(self._num_traj_samples, device=env.device, dtype=torch.float)
         timesteps = timesteps * self._traj_sample_timestep
         traj_timesteps = timestep_beg.unsqueeze(-1) + timesteps
@@ -208,12 +208,24 @@ class ObsComputer():
 
         # for traj_reset
         root_pos = asset.data.root_pos_w[:, 0:3]
+        # root_rot = asset.data.root_quat_w
         if events.amp_obs_reset is True:
             root_pos_reset = root_pos[events.amp_reset_env_ids, ...]
             self._traj_gen.reset(events.amp_reset_env_ids, root_pos_reset) # type: ignore
             self.progress_buf[events.amp_reset_env_ids] = 0 # type: ignore
+            # # check if the traj is behind the robot
+            # traj_endpoints = self._fetch_traj_samples(env)[events.amp_reset_env_ids, 2, :]
+            # root_rot_reset = root_rot[events.amp_reset_env_ids, ...]
+            # self.back_traj_indexs = find_envs_with_traj_back(root_rot_reset, root_pos_reset, traj_endpoints) 
+            # self.back_traj_refer_points = root_pos_reset[self.back_traj_indexs, ...]
+            # self.back_traj_refer_points[..., -1] = 0
 
         traj_samples = self._fetch_traj_samples(env)
+        # if self.back_traj_indexs.numel() != 0:
+        #     traj_samples[self.back_traj_indexs] = 2 * self.back_traj_refer_points.unsqueeze(1).repeat(1, 10, 1)-\
+        #                                                 traj_samples[self.back_traj_indexs]
+        self.progress_buf += 1 # type: ignore
+
         root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)
         obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)
 

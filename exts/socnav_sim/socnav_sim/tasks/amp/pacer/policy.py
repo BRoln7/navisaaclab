@@ -27,6 +27,7 @@ from socnav_sim.tasks.amp.amp_utils.utils.running_mean_std import RunningMeanStd
 from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import flip_loss_left_to_right_index
 import importlib
 
+self_obs_shape = 357
 obs_shape = 357+20+256
 amp_demo_buffer_size = 200000
 amp_batch_size = 512
@@ -179,7 +180,8 @@ class AMPPPO(PPO):
         self.amp_buffer = torch.tensor([]).to("cuda:0")
         self.amp_replay_buffer = ReplayBuffer(amp_demo_buffer_size, "cuda:0")
         # flip obs buffer
-        self.flip_obs_buffer = torch.tensor([]).to("cuda:0")
+        self.flip_obs_buffer = []
+        self.previous_flip_obs = None
 
         self._amp_replay_keep_prob = 0.01
         self._disc_logit_reg = 0.01
@@ -226,8 +228,10 @@ class AMPPPO(PPO):
         
         ################### init buffer ######################
         self.amp_buffer = torch.tensor([]).to("cuda:0")
-        self.flip_obs_buffer = torch.tensor([]).to("cuda:0")
-        self.flip_obs_buffer = obs.flip_humanoid_obs
+        
+        self.flip_obs_buffer = []
+        if self.previous_flip_obs is None:
+            self.previous_flip_obs = obs.flip_humanoid_obs
 
         while n_steps < n_rollout_steps:
             if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
@@ -290,8 +294,8 @@ class AMPPPO(PPO):
             else:
                 self.amp_buffer = torch.cat((self.amp_buffer, obs.amp_replay_obs), dim=0)
 
-            self.flip_obs_buffer = torch.cat([self.flip_obs_buffer, obs.flip_humanoid_obs], dim=0)
-
+            self.flip_obs_buffer.append(self.previous_flip_obs)
+            self.previous_flip_obs = obs.flip_humanoid_obs
 
         with torch.no_grad():
             values = self.policy.predict_values(obs_as_tensor(new_obs, self.device))  # type: ignore[arg-type]
@@ -322,8 +326,10 @@ class AMPPPO(PPO):
         sym_loss = []
 
         ############################## reshape flip_obs_buffer for training ##########################
+        self.flip_obs_buffer = torch.stack(self.flip_obs_buffer, dim=0) # type: ignore
         self.flip_obs_buffer = self.flip_obs_buffer.reshape(self.flip_obs_buffer.size(0)*
-                                                            self.flip_obs_buffer.size(1), -1)
+                                                            self.flip_obs_buffer.size(1), 
+                                                            -1)
 
         continue_training = True
         for epoch in range(self.n_epochs):
@@ -378,6 +384,8 @@ class AMPPPO(PPO):
                 orig_obs_batch = torch.tensor(
                     self.rollout_buffer.observations[flip_batch_index * self.batch_size:
                                                      (flip_batch_index+1) * self.batch_size]).to("cuda:0")
+                flip_obs_batch = torch.cat([flip_obs_batch, orig_obs_batch[:, self_obs_shape:]], dim=1)
+
                 flip_batch_index += 1
 
                 self.sym_loss_coef = 1
@@ -457,6 +465,7 @@ class AMPPPO(PPO):
 
         disc_loss_record = []
         disc_agent_logit_record = []
+        disc_agent_replay_record = []
         disc_demo_logit_record = []
         disc_grad_penalty_record = []
         disc_logit_loss_record = []
@@ -486,15 +495,17 @@ class AMPPPO(PPO):
                 disc_logit_loss_record.append(disc_info['disc_logit_loss'])
                 disc_demo_logit_record.append(np.mean(disc_demo_logit.cpu().detach().numpy()))
                 disc_agent_logit_record.append(np.mean(disc_agent_logit.cpu().detach().numpy()))
+                disc_agent_replay_record.append(np.mean(disc_agent_replay_logit.cpu().detach().numpy()))
 
         del amp_obs, amp_obs_replay, amp_obs_demo
         self.logger.record("train/disc_loss", np.mean(disc_loss_record))
         self.logger.record("train/disc_demo_logit", np.mean(disc_demo_logit_record))
         self.logger.record("train/disc_agent_logit", np.mean(disc_agent_logit_record))  
+        self.logger.record("train/disc_replay_logit", np.mean(disc_agent_replay_record)) 
         self.logger.record("train/disc_grad_penalty", np.mean(disc_grad_penalty_record))  
         self.logger.record("train/disc_logit_loss", np.mean(disc_logit_loss_record))  
         del disc_loss_record, disc_demo_logit_record, disc_agent_logit_record, \
-            disc_grad_penalty_record, disc_logit_loss_record
+            disc_grad_penalty_record, disc_logit_loss_record, disc_agent_replay_record
         torch.cuda.empty_cache()
         gc.collect()
 
@@ -505,7 +516,7 @@ class AMPPPO(PPO):
         include = None,
     ) -> None:
         self.amp_buffer = torch.tensor([]).to("cuda:0")
-        self.flip_obs_buffer = torch.tensor([]).to("cuda:0")
+        self.flip_obs_buffer = []
         super().save(path, exclude, include)
         
         torch.save(discriminator, f='logs/sb3/Isaac-Pacer/discriminator.pth')
@@ -608,9 +619,6 @@ class AMPPPO(PPO):
         orig_a = orig_a[..., left_to_right_index, :]
 
         sym_loss = orig_a.view(B, -1) - flip_a
-
-        # sym_loss = sym_loss.norm(dim = -1)
-        # import ipdb; ipdb.set_trace()
         sym_loss = sym_loss.pow(2).mean(dim = -1) * 50
         return {'sym_loss': sym_loss}
 
