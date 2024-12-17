@@ -512,11 +512,9 @@ class AMPPPO(PPO):
     def save(
         self,
         path,
-        exclude = ['amp_demo_buffer', 'amp_replay_buffer'],
+        exclude = ['amp_buffer', 'amp_demo_buffer', 'amp_replay_buffer', 'flip_obs_buffer'],
         include = None,
     ) -> None:
-        self.amp_buffer = torch.tensor([]).to("cuda:0")
-        self.flip_obs_buffer = []
         super().save(path, exclude, include)
         
         torch.save(discriminator, f='logs/sb3/Isaac-Pacer/discriminator.pth')
@@ -610,8 +608,8 @@ class AMPPPO(PPO):
         B, _ = flip_obs_batch.shape
 
         left_to_right_index = flip_loss_left_to_right_index
-        flip_a, flip_s, _ = self.policy(flip_obs_batch)
-        orig_a, orig_s, _ = self.policy(orig_obs_batch)
+        flip_a, flip_s, _ = self.policy.forward(flip_obs_batch, deterministic=True)
+        orig_a, orig_s, _ = self.policy.forward(orig_obs_batch, deterministic=True)
 
         orig_a = orig_a.view(B, -1, 3)
         orig_a[..., 0] *= -1
