@@ -5,16 +5,16 @@ from omni.isaac.lab.actuators import ImplicitActuatorCfg
 from omni.isaac.lab.assets import ArticulationCfg
 import os
 
-scout_wheel_radius = 0.098
-scout_lenght = 0.262
-scout_width = 0.37558
+scout_wheel_radius = 0.08
+scout_lenght = 0.465
+scout_width = 0.49 # 0.4165
 
 SCOUT_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=os.path.join(os.path.dirname(__file__), 'usd', 'scout_mini.usd'),
+        usd_path=os.path.join(os.getcwd(), 'data', 'usd', 'robots', 'scout_mini.usda'),
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=None,
-            max_depenetration_velocity=10.0,
+            max_depenetration_velocity=1000.0,
             enable_gyroscopic_forces=True,
             max_linear_velocity=1000,
             max_angular_velocity=10,
@@ -28,7 +28,7 @@ SCOUT_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(-0., -0.,  0.)
+        pos=(0., 0.,  0.2)
     ),
     actuators={
         "all_joints": ImplicitActuatorCfg(
@@ -38,14 +38,12 @@ SCOUT_CFG = ArticulationCfg(
                 "front_right_wheel": 0.,
                 "rear_left_wheel": 0.,
                 "rear_right_wheel": 0.,
-                "inertial_joint": 0.,
             },
             damping={
                 "front_left_wheel": 10000000.,
                 "front_right_wheel": 10000000.,
                 "rear_left_wheel": 10000000.,
                 "rear_right_wheel": 10000000.,
-                "inertial_joint": 10000000.,
             },
    ),}
 )

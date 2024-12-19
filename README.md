@@ -67,6 +67,7 @@ If everything executes correctly, it should create a file .python.env in the `.v
 #### agile scout mini
 
 ![scout mini](./assets/scout_mini.png "scout mini")
+![scout mini](./assets/scout_test.gif "scout mini")
 
 ### amass motion capture datasets
 

@@ -7,7 +7,7 @@ import os
 
 SMPL_HUMANOID_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=os.path.join(os.path.dirname(__file__), 'usd', 'smpl_humanoid.usda'),
+        usd_path=os.path.join(os.getcwd(), 'data', 'usd', 'robots', 'smpl_humanoid.usda'),
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=None,
             max_depenetration_velocity=10.0,

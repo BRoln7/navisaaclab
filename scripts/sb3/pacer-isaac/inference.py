@@ -5,7 +5,7 @@ import os
 import yaml
 from omni.isaac.lab.app import AppLauncher
 
-motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'amp.yaml')
+motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 

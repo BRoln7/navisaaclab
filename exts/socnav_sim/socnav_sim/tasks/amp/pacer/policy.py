@@ -11,14 +11,12 @@ from stable_baselines3.common.utils import obs_as_tensor, explained_variance
 import numpy as np
 import gymnasium as gym
 import math
-import random
 import os
 import yaml
 from gymnasium import spaces
 from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
     build_amp_observations_smpl,
-    dof_subset
-)
+    dof_subset)
 from socnav_sim.tasks.amp.amp_utils.utils.replay_buffer import ReplayBuffer
 from socnav_sim.tasks.amp.amp_utils.utils.load_motion import MotionLoad
 from socnav_sim.tasks.amp.amp_utils.utils.discriminator import Discriminator, bias_init
@@ -32,7 +30,7 @@ obs_shape = 357+20+256
 amp_demo_buffer_size = 200000
 amp_batch_size = 512
 
-motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'amp.yaml')
+motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 

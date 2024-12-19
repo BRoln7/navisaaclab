@@ -9,7 +9,7 @@ from omni.isaac.lab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Tutorial on using the interactive scene interface.")
-parser.add_argument("--num_envs", type=int, default=2, help="Number of environments to spawn.")
+parser.add_argument("--num_envs", type=int, default=4, help="Number of environments to spawn.")
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
@@ -32,7 +32,7 @@ from omni.isaac.lab.utils import configclass
 ##
 # Pre-defined configs
 ##
-from socnav_sim.assets.scout_mini import SCOUT_CFG  # isort:skip
+from socnav_sim.assets.scout_mini import SCOUT_CFG, scout_wheel_radius, scout_lenght, scout_width  # isort:skip
 
 
 @configclass
@@ -51,6 +51,22 @@ class ScoutSceneCfg(InteractiveSceneCfg):
     scout: ArticulationCfg = SCOUT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
 
+def four_wheel_differential(twist, wheel_r, length, width):
+    """
+    twist: [num_envs, 2-dimension twist]
+    wheel_r: radius of wheel
+    length: distance of front and rear wheel
+    width: distance of left and right wheel
+    """
+    velocity_tensor = torch.zeros(args_cli.num_envs, 4).to("cuda:0")
+    velocity_tensor[:, 0] = twist[:, 0] - twist[:, 1] * length / 2 + twist[:, 1] * width / 2
+    velocity_tensor[:, 1] = twist[:, 0] - twist[:, 1] * length / 2 - twist[:, 1] * width / 2
+    velocity_tensor[:, 2] = twist[:, 0] + twist[:, 1] * length / 2 + twist[:, 1] * width / 2
+    velocity_tensor[:, 3] = twist[:, 0] + twist[:, 1] * length / 2 - twist[:, 1] * width / 2
+    velocity_tensor = velocity_tensor.clone() / wheel_r
+
+    return velocity_tensor
+
 def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     """Runs the simulation loop."""
     robot = scene["scout"]
@@ -67,8 +83,13 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
             robot.write_joint_state_to_sim(joint_pos, joint_vel)
             scene.reset()
             print("[INFO]: Resetting robot state...")
-        efforts = torch.randn_like(robot.data.joint_pos) * 5.0
-        robot.set_joint_effort_target(efforts)
+        velocity_target = torch.tensor([[1.0, 1.0], 
+                                        [1.0, -1.0],
+                                        [1.0, 1.0], 
+                                        [1.0, -1.0]], device='cuda:0')
+        velocity_tensor = four_wheel_differential(velocity_target, scout_wheel_radius, scout_lenght, scout_width)
+        velocity_tensor[..., [0, 2]] *= -1
+        robot.set_joint_velocity_target(velocity_tensor)
         scene.write_data_to_sim()
         sim.step()
         count += 1
@@ -79,7 +100,7 @@ def main():
     """Main function."""
     sim_cfg = sim_utils.SimulationCfg(device="cuda:0")
     sim = SimulationContext(sim_cfg)
-    sim.set_camera_view([2.5, 0.0, 4.0], [0.0, 0.0, 2.0])
+    sim.set_camera_view([5, 0.0, 5.0], [0.0, 0.0, 2.0])
     scene_cfg = ScoutSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
     scene = InteractiveScene(scene_cfg)
     sim.reset()

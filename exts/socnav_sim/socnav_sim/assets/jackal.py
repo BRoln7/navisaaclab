@@ -11,7 +11,7 @@ jackal_width = 0.37558
 
 JACKAL_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=os.path.join(os.path.dirname(__file__), 'usd', 'jackal.usda'),
+        usd_path=os.path.join(os.getcwd(), 'data', 'usd', 'robots', 'jackal.usda'),
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=None,
             max_depenetration_velocity=10.0,

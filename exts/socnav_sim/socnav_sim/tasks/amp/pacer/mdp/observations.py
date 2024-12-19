@@ -54,7 +54,7 @@ amp_replay_obs = torch.tensor([]).to("cuda:0")
 flip_humanoid_obs = None
 tar_pos: torch.Tensor = None # type: ignore
 
-motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'amp.yaml')
+motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 num_envs = config['env']['num_envs'] # type: ignore
@@ -157,7 +157,7 @@ class ObsComputer():
                               asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
         asset: Articulation = env.scene[asset_cfg.name]
         
-        episode_dur = env.max_episode_length * env.physics_dt * 1.0 # type: ignore
+        episode_dur = env.max_episode_length * env.physics_dt * 4.0 # type: ignore
         num_verts = 101
         dtheta_max = 2.0
         self._traj_gen = traj_generator.TrajGenerator(env.num_envs, episode_dur, num_verts,
@@ -179,7 +179,7 @@ class ObsComputer():
         # 5 seconds with 0.5 second intervals, 10 samples.
         env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long) # type: ignore
 
-        timestep_beg = self.progress_buf[env_ids] * env.physics_dt * 1.0 # type: ignore
+        timestep_beg = self.progress_buf[env_ids] * env.physics_dt * 4.0 # type: ignore
         
         # for local reward
         global tar_pos

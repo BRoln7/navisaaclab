@@ -7,7 +7,7 @@ from socnav_sim.tasks.amp.amp_utils.utils.motion_lib_smpl import MotionLib as Mo
 from poselib.skeleton.skeleton3d import SkeletonTree
 from socnav_sim.uhc.smpllib.smpl_parser import SMPL_Parser
 
-motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'amp.yaml')
+motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 

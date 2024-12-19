@@ -5,18 +5,11 @@ import os
 import yaml
 
 amp_input_shape = 1950
-motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'amp.yaml')
+motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 
 DISC_LOGIT_INIT_SCALE = 1.0
-
-
-seed = 0
-torch.manual_seed(seed)
-os.environ['PYTHONHASHSEED'] = str(seed)
-torch.cuda.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)
 
 class Discriminator(nn.Module):
     def __init__(self):

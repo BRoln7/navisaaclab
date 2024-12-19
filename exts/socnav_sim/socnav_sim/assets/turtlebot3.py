@@ -10,7 +10,7 @@ turtlebot_width = 0.16
 
 TURTLEBOT_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=os.path.join(os.path.dirname(__file__), 'usd', 'turtlebot3.usda'),
+        usd_path=os.path.join(os.getcwd(), 'data', 'usd', 'robots', 'turtlebot3.usda'),
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=None,
             max_depenetration_velocity=10.0,
