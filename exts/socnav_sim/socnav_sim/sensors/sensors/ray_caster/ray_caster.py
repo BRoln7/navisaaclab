@@ -384,8 +384,8 @@ class RTXRayCaster(SensorBase):
             rep_annotator = rep.AnnotatorRegistry.get_annotator("RtxSensorCpuIsaacCreateRTXLidarScanBuffer", do_array_copy=False)
             rep_annotator.attach(render_prod_path)
             # Debug draw
-            self.writer = rep.writers.get("RtxLidarDebugDrawPointCloudBuffer")
-            self.writer.attach(render_prod_path)
+            # self.writer = rep.writers.get("RtxLidarDebugDrawPointCloudBuffer")
+            # self.writer.attach(render_prod_path)
             # add to registry
             if lidar_prim.pathString not in self._rep_registry:
                 self._rep_registry[lidar_prim.pathString] = []

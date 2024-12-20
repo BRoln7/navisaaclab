@@ -40,8 +40,6 @@ if config['env']['task'] == 'Isaac-Pacer': # type: ignore
     global motion_load
     motion_load = MotionLoad(num_envs)
 
-disc_coef = config['training']['disc_coef'] # type: ignore
-
 ###################################################
 ################## preprocess #####################
 ###################################################
@@ -186,6 +184,7 @@ class AMPPPO(PPO):
         self._disc_grad_penalty = 5
         self._disc_weight_decay = 0.0001
         self.bounds_loss_coef = 10
+        self.disc_coef = 5
 
     def _store_replay_amp_obs(self, amp_obs):
         buf_size = self.amp_replay_buffer.get_buffer_size()
@@ -481,7 +480,7 @@ class AMPPPO(PPO):
 
                 disc_agent_cat_logit = torch.cat([disc_agent_logit, disc_agent_replay_logit], dim=0)
                 disc_info = self._disc_loss(disc_agent_cat_logit, disc_demo_logit, amp_obs_demo_batch)
-                disc_loss = disc_coef * disc_info['disc_loss']
+                disc_loss = self.disc_coef * disc_info['disc_loss']
 
                 discriminator.optimizer.zero_grad()
                 disc_loss.backward(retain_graph=False)

@@ -1,16 +1,29 @@
 # config.yaml
 
+# pacer
+# training:
+#   train: False
+#   # checkpoint: null
+#   checkpoint: 'logs/sb3/Isaac-Pacer/pacer0/model_473088000_steps.zip'
+#   lr: 2e-5
+#   disc_coef: 5
+#   bound_loss: 10
+#   # data_file: 'motion_cap/amass_isaac_run_upright_slim.pkl'
+#   data_file: 'motion_cap/amass_isaac_standing_upright_slim.pkl'  
+
+# env:
+#   num_envs: 8
+#   task: Isaac-Pacer
+#   log_name: pacer
+
+
+# drlvo
 training:
-  train: False
-  # checkpoint: null
-  checkpoint: 'logs/sb3/Isaac-Pacer/pacer0/model_473088000_steps.zip'
-  lr: 2e-5
-  disc_coef: 5
-  bound_loss: 10
-  # data_file: 'motion_cap/amass_isaac_run_upright_slim.pkl'
-  data_file: 'motion_cap/amass_isaac_standing_upright_slim.pkl'  
+  train: True
+  checkpoint: null
+  # checkpoint: 'logs/sb3/Isaac-Pacer/pacer0/model_473088000_steps.zip'
 
 env:
-  num_envs: 1
-  task: Isaac-Pacer
-  log_name: pacer
+  num_envs: 8
+  task: Isaac-Drlvo
+  log_name: drlvo
