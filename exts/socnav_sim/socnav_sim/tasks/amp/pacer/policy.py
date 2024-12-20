@@ -514,12 +514,6 @@ class AMPPPO(PPO):
         include = None,
     ) -> None:
         super().save(path, exclude, include)
-        
-        torch.save(discriminator, f='logs/sb3/Isaac-Pacer/discriminator.pth')
-        torch.save(amp_input_mean_std, f='logs/sb3/Isaac-Pacer/amp_input_mean_std.pth')
-
-        torch.save(self.amp_demo_buffer, "/home/social-navigation/data/amp_demo_buffer.pth")
-        torch.save(self.amp_replay_buffer, "/home/social-navigation/data/amp_replay_buffer.pth")
 
     def _disc_loss_neg(self, disc_logits):
         bce = torch.nn.BCEWithLogitsLoss()

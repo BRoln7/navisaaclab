@@ -4,17 +4,13 @@ training:
   train: False
   # checkpoint: null
   checkpoint: 'logs/sb3/Isaac-Pacer/pacer0/model_473088000_steps.zip'
-  # disc_checkpoint: 'logs/sb3/Isaac-Pacer/discriminator.pth'
-  # std_checkpoint: 'logs/sb3/Isaac-Pacer/amp_input_mean_std.pth'
-  # ampbuffer_checkpoint: '/home/social-navigation/data/amp_demo_buffer.pth'
-  # replaybuffer_checkpoint: '/home/social-navigation/data/amp_replay_buffer.pth'
   lr: 2e-5
   disc_coef: 5
   bound_loss: 10
-  data_file: 'motion_cap/amass_isaac_run_upright_slim.pkl'
-  # data_file: 'motion_cap/amass_isaac_standing_upright_slim.pkl'  
+  # data_file: 'motion_cap/amass_isaac_run_upright_slim.pkl'
+  data_file: 'motion_cap/amass_isaac_standing_upright_slim.pkl'  
 
 env:
-  num_envs: 4
+  num_envs: 1
   task: Isaac-Pacer
   log_name: pacer

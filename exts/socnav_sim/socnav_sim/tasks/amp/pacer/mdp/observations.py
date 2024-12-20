@@ -21,7 +21,6 @@ from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
     compute_location_observations,
     build_amp_observations_smpl,
     get_height_maps_jit,
-    # find_envs_with_traj_back,
     dof_sim_to_gym,
     body_sim_to_gym,
     dof_subset,
@@ -36,16 +35,23 @@ import omni.isaac.lab.sim as sim_utils
 if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedEnv, ManagerBasedRLEnv
 
-trajectory_cfg = VisualizationMarkersCfg(
-    prim_path="/World/Visuals/TrajectoryMarkers",
-    markers={
-        "waypoints": sim_utils.SphereCfg(
-            radius=0.05,
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.5))
-        )
-    }
-)
-trajectory_marker = VisualizationMarkers(trajectory_cfg)
+
+motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
+with open(motion_file, 'r') as file:
+    config = yaml.safe_load(file)
+num_envs = config['env']['num_envs'] # type: ignore
+
+if config['env']['task'] == 'Isaac-Pacer': # type: ignore
+    trajectory_cfg = VisualizationMarkersCfg(
+        prim_path="/World/Visuals/TrajectoryMarkers",
+        markers={
+            "waypoints": sim_utils.SphereCfg(
+                radius=0.05,
+                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.5))
+            )
+        }
+    )
+    trajectory_marker = VisualizationMarkers(trajectory_cfg)
 
 # config params
 amp_obs_shape = 1950
@@ -53,11 +59,6 @@ amp_obs_shape_step = 195
 amp_replay_obs = torch.tensor([]).to("cuda:0")
 flip_humanoid_obs = None
 tar_pos: torch.Tensor = None # type: ignore
-
-motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
-with open(motion_file, 'r') as file:
-    config = yaml.safe_load(file)
-num_envs = config['env']['num_envs'] # type: ignore
 
 #########################################################################################
 ##################################### function for obs ################################## 
@@ -85,9 +86,6 @@ class ObsComputer():
         self.height_sample_width = 1.0
         self.num_samples_per_axis = 16
         self.height_sample_init_flag = False
-    
-        # self.back_traj_indexs = torch.tensor([], device='cuda:0')
-        # self.back_traj_refer_points = torch.tensor([], device='cuda:0')
 
         self.amp_obs_buf = torch.zeros(
             (num_envs, 10, amp_obs_shape_step), device="cuda:0", dtype=torch.float)
@@ -157,7 +155,7 @@ class ObsComputer():
                               asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
         asset: Articulation = env.scene[asset_cfg.name]
         
-        episode_dur = env.max_episode_length * env.physics_dt * 4.0 # type: ignore
+        episode_dur = env.max_episode_length * env.physics_dt * 2.0 # type: ignore
         num_verts = 101
         dtheta_max = 2.0
         self._traj_gen = traj_generator.TrajGenerator(env.num_envs, episode_dur, num_verts,
@@ -179,7 +177,7 @@ class ObsComputer():
         # 5 seconds with 0.5 second intervals, 10 samples.
         env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long) # type: ignore
 
-        timestep_beg = self.progress_buf[env_ids] * env.physics_dt * 4.0 # type: ignore
+        timestep_beg = self.progress_buf[env_ids] * env.physics_dt * 2.0 # type: ignore
         
         # for local reward
         global tar_pos
@@ -213,17 +211,8 @@ class ObsComputer():
             root_pos_reset = root_pos[events.amp_reset_env_ids, ...]
             self._traj_gen.reset(events.amp_reset_env_ids, root_pos_reset) # type: ignore
             self.progress_buf[events.amp_reset_env_ids] = 0 # type: ignore
-            # # check if the traj is behind the robot
-            # traj_endpoints = self._fetch_traj_samples(env)[events.amp_reset_env_ids, 2, :]
-            # root_rot_reset = root_rot[events.amp_reset_env_ids, ...]
-            # self.back_traj_indexs = find_envs_with_traj_back(root_rot_reset, root_pos_reset, traj_endpoints) 
-            # self.back_traj_refer_points = root_pos_reset[self.back_traj_indexs, ...]
-            # self.back_traj_refer_points[..., -1] = 0
 
         traj_samples = self._fetch_traj_samples(env)
-        # if self.back_traj_indexs.numel() != 0:
-        #     traj_samples[self.back_traj_indexs] = 2 * self.back_traj_refer_points.unsqueeze(1).repeat(1, 10, 1)-\
-        #                                                 traj_samples[self.back_traj_indexs]
         self.progress_buf += 1 # type: ignore
 
         root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)

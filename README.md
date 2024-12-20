@@ -69,6 +69,10 @@ If everything executes correctly, it should create a file .python.env in the `.v
 ![scout mini](./assets/scout_mini.png "scout mini")
 ![scout mini](./assets/scout_test.gif "scout mini")
 
+#### agile scout mini with VELODYNE_VLS128
+
+![scout mini](./assets/lidar_test.gif "scout mini")
+
 ### amass motion capture datasets
 
 for training: https://drive.google.com/file/d/15d5ZKOpKIN-rVguq-EsAk5oTX_YDoHdy/view?usp=sharing
