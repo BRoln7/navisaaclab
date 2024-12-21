@@ -28,7 +28,7 @@ SCOUT_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0., 0.,  0.2)
+        pos=(10., 10.,  0.2)
     ),
     actuators={
         "all_joints": ImplicitActuatorCfg(

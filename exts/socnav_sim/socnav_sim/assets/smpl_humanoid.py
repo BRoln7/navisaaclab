@@ -24,7 +24,7 @@ SMPL_HUMANOID_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(-0.1443, -0.2548,  0.9556),
+        pos=(10, 10,  0.9556),
         rot=(-0.7487, -0.0248,  0.0320, -0.6617),
     ),
     actuators={

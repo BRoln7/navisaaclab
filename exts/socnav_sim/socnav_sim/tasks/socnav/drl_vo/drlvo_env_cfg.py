@@ -119,6 +119,11 @@ class EventCfg:
         mode="reset",
         params={"pose_range": {}, "velocity_range": {}},
     )
+    ############ for peds ##############
+    reset_base = EventTerm(
+        func=mdp.reset_init_state_amp_motion,
+        mode="reset",
+    )
 
 
 @configclass
@@ -142,6 +147,8 @@ class TerminationsCfg:
     # (2) Terminate if the robot falls
     # reach_goal = DoneTerm(func=mdp.reach_goal, params={"minimum_height": 0.6})
 
+    ############ for peds ##############
+    torso_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.6})
 
 @configclass
 class CurriculumCfg:

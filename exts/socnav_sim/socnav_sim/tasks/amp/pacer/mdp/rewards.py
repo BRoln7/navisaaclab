@@ -7,7 +7,7 @@ from socnav_sim.tasks.amp.amp_utils.utils.rewards_utils import (
 )
 import socnav_sim.tasks.amp.pacer.mdp.observations as obs
 power_coefficient = 0.0005
-direction_coefficient = 1.0
+direction_coefficient = 2.0
 
 def compute_location_reward(env: ManagerBasedEnv, 
                             asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),

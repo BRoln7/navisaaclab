@@ -6,8 +6,6 @@ import omni.isaac.lab.utils.math as math_utils
 from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import dof_gym_to_sim
 import socnav_sim.tasks.amp.pacer.policy as policy
 
-amp_obs_reset = False
-
 def reset_init_state_amp_motion(
     env: ManagerBasedEnv,
     env_ids: torch.Tensor,
