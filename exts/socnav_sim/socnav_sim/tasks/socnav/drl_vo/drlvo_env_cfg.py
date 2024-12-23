@@ -13,6 +13,7 @@ from omni.isaac.lab.managers import RewardTermCfg as RewTerm
 from omni.isaac.lab.managers import TerminationTermCfg as DoneTerm
 from omni.isaac.lab.scene import InteractiveSceneCfg
 from omni.isaac.lab.terrains import TerrainImporterCfg
+from omni.isaac.lab.managers import SceneEntityCfg
 from omni.isaac.lab.utils import configclass
 
 from socnav_sim.assets.smpl_humanoid import SMPL_HUMANOID_CFG
@@ -61,6 +62,11 @@ class DrlvoSceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=5000.0),
     )
 
+    # scene
+    scene = AssetBaseCfg(
+        prim_path="/World/scene",
+        spawn=sim_utils.UsdFileCfg(usd_path=f"data/usd/scenes/warehouse.usd"),
+    )
 
 ##
 # MDP settings
@@ -78,9 +84,6 @@ class CommandsCfg:
 class ActionsCfg:
     """Action specifications for the MDP."""
 
-    # navigate = mdp.JointPositionActionDrlvoCfg(
-    #     asset_name="robot", joint_names=[".*"], scale=3.1416, offset=0.0,
-    # )
     navigate = mdp.JointPositionActionCfg(
         asset_name="robot", joint_names=[".*"], scale=1.0, offset=0.0,
     )
@@ -97,10 +100,10 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         """Observations for the policy."""
-        # peds_obs = ObsTerm(func=mdp.compute_peds_obs)
-        # lidar_obs = ObsTerm(func=mdp.compute_lidar_obs)
+        peds_obs = ObsTerm(func=mdp.compute_peds_obs)
+        lidar_obs = ObsTerm(func=mdp.compute_lidar_obs,
+                            params={"sensor_cfg": SceneEntityCfg("lidar")})
         # subgoal_obs = ObsTerm(func=mdp.compute_subgoal_obs)
-        peds_obs = ObsTerm(func=mdp.joint_vel_rel)
 
         def __post_init__(self):
             self.enable_corruption = False

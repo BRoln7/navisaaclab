@@ -1,4 +1,6 @@
 import torch
+import yaml
+import os
 from omni.isaac.lab.envs import ManagerBasedEnv
 from omni.isaac.lab.assets import Articulation
 from omni.isaac.lab.managers import SceneEntityCfg
@@ -6,8 +8,16 @@ from socnav_sim.tasks.amp.amp_utils.utils.rewards_utils import (
     compute_location_rew,
 )
 import socnav_sim.tasks.amp.pacer.mdp.observations as obs
+
+
+motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
+with open(motion_file, 'r') as file:
+    config = yaml.safe_load(file)
+if config['env']['task'] == 'Isaac-Pacer': # type: ignore
+    traj_speed = config['env']['traj_speed'] # type: ignore
+    direction_coefficient = traj_speed
+
 power_coefficient = 0.0005
-direction_coefficient = 2.0
 
 def compute_location_reward(env: ManagerBasedEnv, 
                             asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),

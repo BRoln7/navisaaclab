@@ -139,7 +139,7 @@ class PacerAction(JointAction):
                               asset_cfg: SceneEntityCfg = SceneEntityCfg("ped")):
         asset: Articulation = env.scene[asset_cfg.name]
         
-        episode_dur = env.max_episode_length * env.physics_dt * 2.0 # type: ignore
+        episode_dur = env.max_episode_length * env.physics_dt * 1.78 # type: ignore
         num_verts = 101
         dtheta_max = 2.0
         self._traj_gen = traj_generator.TrajGenerator(env.num_envs, episode_dur, num_verts,
@@ -161,7 +161,7 @@ class PacerAction(JointAction):
         # 5 seconds with 0.5 second intervals, 10 samples.
         env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long) # type: ignore
 
-        timestep_beg = self.progress_buf[env_ids] * env.physics_dt * 2.0 # type: ignore
+        timestep_beg = self.progress_buf[env_ids] * env.physics_dt * 1.78 # type: ignore
         
         timesteps = torch.arange(self._num_traj_samples, device=env.device, dtype=torch.float)
         timesteps = timesteps * self._traj_sample_timestep

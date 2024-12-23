@@ -52,6 +52,7 @@ if config['env']['task'] == 'Isaac-Pacer': # type: ignore
         }
     )
     trajectory_marker = VisualizationMarkers(trajectory_cfg)
+    traj_speed = config['env']['traj_speed'] # type: ignore
 
 # config params
 amp_obs_shape = 1950
@@ -155,7 +156,7 @@ class ObsComputer():
                               asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
         asset: Articulation = env.scene[asset_cfg.name]
         
-        episode_dur = env.max_episode_length * env.physics_dt * 2.0 # type: ignore
+        episode_dur = env.max_episode_length * env.physics_dt * traj_speed # type: ignore
         num_verts = 101
         dtheta_max = 2.0
         self._traj_gen = traj_generator.TrajGenerator(env.num_envs, episode_dur, num_verts,
@@ -177,7 +178,7 @@ class ObsComputer():
         # 5 seconds with 0.5 second intervals, 10 samples.
         env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long) # type: ignore
 
-        timestep_beg = self.progress_buf[env_ids] * env.physics_dt * 2.0 # type: ignore
+        timestep_beg = self.progress_buf[env_ids] * env.physics_dt * traj_speed # type: ignore
         
         # for local reward
         global tar_pos

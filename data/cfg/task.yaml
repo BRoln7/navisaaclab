@@ -4,7 +4,7 @@
 # training:
 #   train: True
 #   checkpoint: null
-#   # checkpoint: 'logs/sb3/Isaac-Pacer/pacer0/model_473088000_steps.zip'
+#   # checkpoint: 'logs/sb3/Isaac-Pacer/pacer1.75/model_254976000_steps.zip'
 #   lr: 2e-5
 #   disc_coef: 5
 #   bound_loss: 10
@@ -14,10 +14,11 @@
 # env:
 #   num_envs: 3072
 #   task: Isaac-Pacer
-#   log_name: pacer
+#   log_name: pacer1.88
+#   traj_speed: 1.88
 
 
-# # drlvo
+# drlvo
 training:
   train: True
   checkpoint: null
@@ -25,6 +26,6 @@ training:
   data_file: 'motion_cap/amass_isaac_standing_upright_slim.pkl' 
 
 env:
-  num_envs: 12
+  num_envs: 4
   task: Isaac-Drlvo
   log_name: drlvo

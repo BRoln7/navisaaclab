@@ -1,3 +1,5 @@
+# put the desired policy.pth in data/checkpoints, then run command "python script/tools convert_sb3_policy.py"
+
 import torch
 import os
 
