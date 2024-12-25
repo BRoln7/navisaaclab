@@ -6,8 +6,13 @@ from omni.isaac.lab.assets import ArticulationCfg
 import os
 
 SMPL_HUMANOID_CFG = ArticulationCfg(
-    spawn=sim_utils.UsdFileCfg(
-        usd_path=os.path.join(os.getcwd(), 'data', 'usd', 'robots', 'smpl_humanoid.usda'),
+    spawn=sim_utils.MultiUsdFileCfg(
+        usd_path=[
+            f"data/usd/robots/smpl_humanoid_purple.usda",
+            f"data/usd/robots/smpl_humanoid.usda",
+        ],
+        random_choice=True,
+        copy_from_source=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=None,
             max_depenetration_velocity=10.0,
@@ -24,7 +29,7 @@ SMPL_HUMANOID_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(10, 10,  0.9556),
+        pos=(2, 2,  0.9556),
         rot=(-0.7487, -0.0248,  0.0320, -0.6617),
     ),
     actuators={

@@ -78,7 +78,7 @@ If everything executes correctly, it should create a file .python.env in the `.v
 for training: https://drive.google.com/file/d/15d5ZKOpKIN-rVguq-EsAk5oTX_YDoHdy/view?usp=sharing
 for inference: https://drive.google.com/file/d/1f3ORB2xZROVRCvLcB6gizpgVeY1H3itO/view?usp=sharing
 
-### Training scene
+### AMP Training scene
 ![training for amp](./assets/walk_results.gif "training for amp")
 ![training for amp](./assets/pacer_motion_results.gif "training for amp")
 
@@ -88,3 +88,6 @@ for inference: https://drive.google.com/file/d/1f3ORB2xZROVRCvLcB6gizpgVeY1H3itO
 
 ### Inference phase
 ./isaaclab.sh -p -m tensorboard.main --logdir logs/sb3/task...
+
+### M-peds and N-robots
+![n_peds&m_robots](./assets/n_peds&m_robots.gif "n_peds&m_robots")

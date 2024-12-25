@@ -19,7 +19,7 @@ motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 num_envs = config['env']['num_envs'] # type: ignore
-
+num_robots = config['env']['num_robots'] # type: ignore
 if config['env']['task'] == 'Isaac-Drlvo': # type: ignore
     lidar_visual_cfg = VisualizationMarkersCfg(
         prim_path="/World/Visuals/LidarMarkers",
@@ -43,21 +43,21 @@ def compute_peds_obs(env: ManagerBasedEnv,
     ped: Articulation = env.scene[asset_cfg2.name]
 
     # get kinematic info of peds in world frame
-    ped_pos_w = ped.data.root_pos_w.unsqueeze(1).repeat(1, env.num_envs, 1)
-    ped_vel_w = ped.data.root_lin_vel_w.unsqueeze(1).repeat(1, env.num_envs, 1)
+    ped_pos_w = ped.data.root_pos_w.unsqueeze(0).repeat(num_robots, 1, 1)
+    ped_vel_w = ped.data.root_lin_vel_w.unsqueeze(0).repeat(num_robots, 1, 1)
     
     # transform kinematic info into robot frame
-    robot_pos_w = robot.data.root_pos_w.unsqueeze(0).repeat(env.num_envs, 1, 1)
-    robot_quat_w = robot.data.root_quat_w
-    robot_vel_w = robot.data.root_lin_vel_w.unsqueeze(0).repeat(env.num_envs, 1, 1)
+    robot_pos_w = robot.data.root_pos_w[:num_robots].unsqueeze(1).repeat(1, env.num_envs, 1)
+    robot_quat_w = robot.data.root_quat_w[:num_robots]
+    robot_vel_w = robot.data.root_lin_vel_w[:num_robots].unsqueeze(1).repeat(1, env.num_envs, 1)
     # for pos
     ped_pos_r = ped_pos_w - robot_pos_w # translation
-    ped_pos_r = rotation_transform(ped_pos_r, robot_quat_w, env.num_envs) # rotation
+    ped_pos_r = rotation_transform(ped_pos_r, robot_quat_w) # rotation
     ped_pos_r = torch.clamp(ped_pos_r, max=10, min=-10)
     # for vel
     ped_vel_r = ped_vel_w - robot_vel_w
     # peds info encode
-    peds_encode = torch.zeros((env.num_envs, 2, 80, 80), device='cuda:0')
+    peds_encode = torch.zeros((num_robots, 2, 80, 80), device='cuda:0')
     collumn = torch.floor(-(ped_pos_r[...,1]-10)/0.25).to(torch.int)
     row = torch.floor(ped_pos_r[...,0]/0.25).to(torch.int)
     
@@ -67,6 +67,11 @@ def compute_peds_obs(env: ManagerBasedEnv,
     peds_encode[:, 0, row, collumn] = ped_vel_r[..., 0]
     peds_encode[:, 1, row, collumn] = ped_vel_r[..., 1]
 
+    if (num_envs-num_robots) > 0:
+        peds_encode = torch.cat([peds_encode, 
+                                 torch.zeros((num_envs-num_robots, 2, 80, 80), device='cuda:0')], 
+                                 dim=0)
+
     # MaxAbsScaler
     v_min = -2
     v_max = 2
@@ -75,9 +80,9 @@ def compute_peds_obs(env: ManagerBasedEnv,
 
     return peds_encode
 
-def quat_to_rot_matrix(quats, num_envs):
+def quat_to_rot_matrix(quats, _num_robots):
     qw, qx, qy, qz = quats[:,0], quats[:,1], quats[:,2], quats[:,3]
-    rot_matrix = torch.zeros((num_envs, 3, 3), device='cuda:0', dtype=torch.float32)
+    rot_matrix = torch.zeros((_num_robots, 3, 3), device='cuda:0', dtype=torch.float32)
     rot_matrix[:, 0, 0] = 1 - 2 * (qy ** 2 + qz ** 2)
     rot_matrix[:, 0, 1] = 2 * (qx * qy - qw * qz)
     rot_matrix[:, 0, 2] = 2 * (qx * qz + qw * qy)
@@ -92,11 +97,12 @@ def quat_to_rot_matrix(quats, num_envs):
 
     return rot_matrix
 
-def rotation_transform(relative_positions, quats, num_envs):
+def rotation_transform(relative_positions, quats):
     m, n, _ = relative_positions.shape
-    rot_matrices = quat_to_rot_matrix(quats, num_envs)
-    relative_positions = relative_positions.unsqueeze(-1)  # (m, n, 2, 1)
-    transformed_positions = torch.matmul(rot_matrices.unsqueeze(0), relative_positions)  # (m, n, 3, 1)
+    rot_matrices = quat_to_rot_matrix(quats, m) # (num_robots, 3, 3)
+    relative_positions = relative_positions.unsqueeze(-1)  # (num_robots, num_peds, 3, 1)
+    transformed_positions = torch.matmul(rot_matrices.unsqueeze(1).repeat(1, n, 1, 1), 
+                                         relative_positions)  # (m, n, 3, 1)
     transformed_positions = transformed_positions[:, :, :2, 0]
 
     return transformed_positions
@@ -111,11 +117,15 @@ def compute_lidar_obs(env: ManagerBasedEnv,
     lidar_sensor: RTXRayCaster = env.scene.sensors[sensor_cfg.name] # type: ignore
     if lidar_sensor.data[list(lidar_sensor.data.keys())[0]][0].data.numel() != 0: # type: ignore
         lidar_data, lidar_ranges = raw_lidar_process(lidar_sensor)
-        lidar_marker.visualize(translations=(lidar_data+asset.data.root_pos_w.unsqueeze(1).repeat(1, 720, 1)).reshape(-1,3)) # type: ignore
+        lidar_marker.visualize(translations=(lidar_data+\
+                                             asset.data.root_pos_w[:num_robots].unsqueeze(1).repeat(1, 720, 1)).reshape(-1,3)) # type: ignore
     else:
-        lidar_ranges = torch.zeros((env.num_envs, 720), device='cuda:0')
+        lidar_ranges = torch.zeros((num_robots, 720), device='cuda:0')
 
-    lidar_obs = lidar_pooling(lidar_ranges, env.num_envs)
+    lidar_obs = lidar_pooling(lidar_ranges, num_robots)
+
+    if (num_envs-num_robots) > 0:
+        lidar_obs = torch.cat([lidar_obs, torch.zeros((num_envs-num_robots, 80*80),device='cuda:0')], dim=0)
 
     return lidar_obs
 
@@ -124,9 +134,12 @@ def raw_lidar_process(_lidar:RTXRayCaster) -> tuple[torch.Tensor, torch.Tensor]:
     """
     load raw lidar data and extract the 720 points needed
     """
+
     lidar = _lidar
     lidar_data_info = []
     lidar_ranges_info = []
+    robot_index = 0
+
     for key in lidar.data:
         # collect raw data
         raw_lidar_data = lidar.data[key][0].data.to('cuda:0') # type: ignore
@@ -157,13 +170,19 @@ def raw_lidar_process(_lidar:RTXRayCaster) -> tuple[torch.Tensor, torch.Tensor]:
 
         lidar_data_info.append(filtered_lidar_data)
         lidar_ranges_info.append(filtered_lidar_ranges)
+
+        robot_index += 1
+
+        if robot_index == num_robots:
+            break
+
     final_lidar_data = torch.stack(lidar_data_info)
     final_lidar_ranges = torch.stack(lidar_ranges_info)
 
     return final_lidar_data, final_lidar_ranges
 
 def lidar_pooling(_lidar_current_data:torch.Tensor,
-                  _num_envs)->torch.Tensor:
+                  _num_robots)->torch.Tensor:
     """
     MIN-AVG Pooling
     """
@@ -177,22 +196,22 @@ def lidar_pooling(_lidar_current_data:torch.Tensor,
     # pooling    
     if lidar_history_data.size(1) == 11:
         lidar_history_data = lidar_history_data[:,1:,:]
-        lidar_data_input = lidar_history_data.reshape(_num_envs, -1)
+        lidar_data_input = lidar_history_data.reshape(_num_robots, -1)
         
         # MIN-AVG
-        lidar_data_input = lidar_data_input.reshape(_num_envs, 800, 9)
-        scan_min = lidar_data_input.min(dim=2).values.reshape(_num_envs, 10, -1)
-        scan_avg = lidar_data_input.mean(dim=2).reshape(_num_envs, 10, -1)
+        lidar_data_input = lidar_data_input.reshape(_num_robots, 800, 9)
+        scan_min = lidar_data_input.min(dim=2).values.reshape(_num_robots, 10, -1)
+        scan_avg = lidar_data_input.mean(dim=2).reshape(_num_robots, 10, -1)
         scan_min_avg = torch.cat([scan_min, scan_avg], dim=1)
         scan_min_avg = scan_min_avg.repeat(1, 4, 1)
 
         # Normalize
         s_min = 0
         s_max = 30
-        scan_min_avg = scan_min_avg.reshape(_num_envs, -1)
+        scan_min_avg = scan_min_avg.reshape(_num_robots, -1)
         scan_min_avg = 2 * (scan_min_avg - s_min) / (s_max - s_min) + (-1)
 
         return scan_min_avg
 
     else:
-        return torch.ones((_num_envs, 80*80), device='cuda:0') * -1
+        return torch.ones((_num_robots, 80*80), device='cuda:0') * -1

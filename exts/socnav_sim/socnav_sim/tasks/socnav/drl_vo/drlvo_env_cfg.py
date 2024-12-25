@@ -21,6 +21,7 @@ from socnav_sim.assets.scout_mini import SCOUT_CFG
 from socnav_sim.sensors.sensors.ray_caster import RTXRayCaster, RTXRayCasterCfg
 from socnav_sim.sensors.sim.spawners.sensors.sensors_cfg import LidarCfg
 import socnav_sim.tasks.socnav.drl_vo.mdp as mdp
+from omni.isaac.lab.actuators import ImplicitActuatorCfg
 
 ##
 # Scene definition
@@ -47,7 +48,7 @@ class DrlvoSceneCfg(InteractiveSceneCfg):
     # robots
     ped: ArticulationCfg = SMPL_HUMANOID_CFG.replace(prim_path="{ENV_REGEX_NS}/Ped") # type: ignore
     robot: ArticulationCfg = SCOUT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot") # type: ignore
-
+    
     # sensor
     lidar = RTXRayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/scout_mini/base_link/lidar",
@@ -118,12 +119,6 @@ class EventCfg:
     """Configuration for events."""
 
     reset_base = EventTerm(
-        func=mdp.reset_root_state_uniform,
-        mode="reset",
-        params={"pose_range": {}, "velocity_range": {}},
-    )
-    ############ for peds ##############
-    reset_base = EventTerm(
         func=mdp.reset_init_state_amp_motion,
         mode="reset",
     )
@@ -151,7 +146,7 @@ class TerminationsCfg:
     # reach_goal = DoneTerm(func=mdp.reach_goal, params={"minimum_height": 0.6})
 
     ############ for peds ##############
-    torso_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.6})
+    torso_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.4})
 
 @configclass
 class CurriculumCfg:
@@ -164,7 +159,7 @@ class CurriculumCfg:
 class DrlvoEnvCfg(ManagerBasedRLEnvCfg):
 
     # Scene settings
-    scene: DrlvoSceneCfg = DrlvoSceneCfg(num_envs=8, env_spacing=6)
+    scene: DrlvoSceneCfg = DrlvoSceneCfg(num_envs=8, env_spacing=3)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()

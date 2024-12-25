@@ -7,7 +7,7 @@ import os
 
 scout_wheel_radius = 0.08
 scout_lenght = 0.465
-scout_width = 0.49 # 0.4165
+scout_width = 0.49
 
 SCOUT_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(

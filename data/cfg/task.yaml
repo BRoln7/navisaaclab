@@ -14,8 +14,8 @@
 # env:
 #   num_envs: 3072
 #   task: Isaac-Pacer
-#   log_name: pacer1.88
-#   traj_speed: 1.88
+#   log_name: pacer1.92
+#   traj_speed: 1.92
 
 
 # drlvo
@@ -26,6 +26,7 @@ training:
   data_file: 'motion_cap/amass_isaac_standing_upright_slim.pkl' 
 
 env:
-  num_envs: 4
+  num_envs: 10
+  num_robots: 2
   task: Isaac-Drlvo
   log_name: drlvo
