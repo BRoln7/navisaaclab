@@ -13,9 +13,11 @@ motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 num_envs = config['env']['num_envs'] # type: ignore
-num_robots = config['env']['num_robots'] # type: ignore
+
 if config['env']['task'] == 'Isaac-Drlvo': # type: ignore
-  motion_load = MotionLoad(num_envs)
+    motion_load = MotionLoad(num_envs)
+
+    num_robots = config['env']['num_robots'] # type: ignore
 
 robots_init = False
 

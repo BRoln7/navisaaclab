@@ -30,7 +30,6 @@ import torch
 import numpy as np
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.logger import configure
-from stable_baselines3.ppo import PPO
 
 from omni.isaac.lab.utils.dict import print_dict
 from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
@@ -39,6 +38,8 @@ import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 import socnav_sim.tasks
+from socnav_sim.tasks.socnav.drl_vo.policy import MRPPO
+from custom_cnn_full import CustomCNN
 import os
 
 def main():
@@ -65,7 +66,9 @@ def main():
     policy_arch = agent_cfg.pop("policy")
     n_timesteps = agent_cfg.pop("n_timesteps")
 
+    ################### make env #####################
     env = gym.make(args_cli.task, cfg=env_cfg)
+
     env = Sb3VecEnvWrapper(env) # type: ignore
     env.seed(seed=agent_cfg["seed"])
 
@@ -80,7 +83,13 @@ def main():
         shape= env.action_space.shape,
     )
 
-    agent = PPO(policy_arch, env, verbose=2, **agent_cfg)
+    policy_kwargs = dict(
+    features_extractor_class=CustomCNN,
+    features_extractor_kwargs = dict(features_dim=256),
+    net_arch=dict(pi=[256], vf=[128]),
+    )
+
+    agent = MRPPO.load('models/drl/drl_pre_train.zip', env=env, policy_kwargs=policy_kwargs, device='cuda:0')
     new_logger = configure(log_dir, ["stdout", "tensorboard"])
     agent.set_logger(new_logger)
     print("[INFO]:agents loaded")

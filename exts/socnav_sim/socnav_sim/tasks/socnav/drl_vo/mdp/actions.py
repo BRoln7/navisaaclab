@@ -3,6 +3,7 @@ from omni.isaac.lab.utils import configclass
 from omni.isaac.lab.managers.action_manager import ActionTerm, ActionTermCfg
 from omni.isaac.lab.envs import ManagerBasedEnv
 from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import dof_gym_to_sim
+import socnav_sim.assets.scout_mini as scout_robot
 
 import torch
 from torch import nn
@@ -42,6 +43,7 @@ if config['env']['task'] == 'Isaac-Drlvo': # type: ignore
     )
     trajectory_marker = VisualizationMarkers(trajectory_cfg)
 
+    num_robots = config['env']['num_robots'] # type: ignore
 
 class AnimationNet(nn.Module):
     def __init__(self):
@@ -60,13 +62,16 @@ class AnimationNet(nn.Module):
         output = self.disc_mlp(norm_obs)
         return output
 
-class PacerAction(JointAction):
+class NavWithPedAction(JointAction):
     cfg: actions_cfg.JointPositionActionCfg
 
     def __init__(self, cfg: actions_cfg.JointPositionActionCfg, env: ManagerBasedEnv):
         super().__init__(cfg, env)
+        
         if cfg.use_default_offset:
             self._offset = self._asset.data.default_joint_pos[:, self._joint_ids].clone()
+ 
+        ############### peds ################
         self.animation_net = AnimationNet()
         actions_policy = torch.load(actions_path)
         self.animation_net.load_state_dict(actions_policy)
@@ -87,8 +92,16 @@ class PacerAction(JointAction):
         self.height_sample_width = 1.0
         self.num_samples_per_axis = 16
         self.height_sample_init_flag = False
+        self.ped_actions = None
+        self.robot_actions = None
+        self.ped_scale = 3.1416
+        self.ped_offset = 0.0
+        
+        ############### robots ################
+
 
     def process_actions(self, actions):
+        ############### peds ################
         humanoid_obs = self.compute_humanoid_obs(self._env)
         task_obs = self.compute_task_obs(self._env)
         terrain_obs = self.compute_height_obs(self._env)
@@ -96,23 +109,59 @@ class PacerAction(JointAction):
 
         with torch.no_grad():
             ped_actions = self.animation_net(obs)
-        self._raw_actions[:] = ped_actions
-        # self._raw_actions[:] = actions
-        self._pd_actions = self._raw_actions * self._scale + self._offset
-        self._processed_actions = self._pd_actions[:, dof_gym_to_sim]
-        self.freeze_hands_toes()
+        self.ped_actions = ped_actions * self.ped_scale + self.ped_offset
+        self.ped_actions = self.ped_actions[:, dof_gym_to_sim]
+        self.freeze_hands_toes(self._env.scene['ped'])
+
+        ############### robots ################
+        vx_min = 0
+        vx_max = 0.5
+        vz_min = -2
+        vz_max = 2
+        self._processed_actions[..., 0] = (actions[..., 0] + 1) * (vx_max - vx_min) / 2 + vx_min # lin_vel
+        self._processed_actions[..., 1] = (actions[..., 1] + 1) * (vz_max - vz_min) / 2 + vz_min # ang_vel
+        self.robot_actions = self.four_wheel_differential(self._processed_actions,
+                                                          scout_robot.scout_wheel_radius,
+                                                          scout_robot.scout_lenght,
+                                                          scout_robot.scout_width)
 
     def apply_actions(self):
-         self._asset.set_joint_position_target(self.processed_actions, joint_ids=self._joint_ids)
+         ############### peds ################
+         ped_asset: Articulation = self._env.scene['ped']
+         ped_asset.set_joint_position_target(self.ped_actions) # type: ignore
 
-    def freeze_hands_toes(self):
+         ############### robots ################
+         self._asset.set_joint_velocity_target(self.robot_actions) # type: ignore
+
+
+    def freeze_hands_toes(self, ped_asset: Articulation):
         freeze_joint_name = ['L_Hand_x', 'L_Hand_y', 'L_Hand_z',
                             'R_Hand_x', 'R_Hand_y', 'R_Hand_z',
                             'L_Toe_x', 'L_Toe_y', 'L_Toe_z',
                             'R_Toe_x', 'R_Toe_y', 'R_Toe_z']
-        freeze_joint_idx = self._asset.find_joints(freeze_joint_name)
-        self._processed_actions[:, freeze_joint_idx[0]] = 0
+        freeze_joint_idx = ped_asset.find_joints(freeze_joint_name)
+        self.ped_actions[:, freeze_joint_idx[0]] = 0 # type: ignore
 
+
+    def four_wheel_differential(self, twist, wheel_r, length, width):
+        """
+        twist: [num_envs, 2-dimension twist]
+        wheel_r: radius of wheel
+        length: distance of front and rear wheel
+        width: distance of left and right wheel
+        """
+        velocity_tensor = torch.zeros(self._env.num_envs, 4).to("cuda:0")
+        velocity_tensor[:, 0] = twist[:, 0] - twist[:, 1] * length / 2 + twist[:, 1] * width / 2
+        velocity_tensor[:, 1] = twist[:, 0] - twist[:, 1] * length / 2 - twist[:, 1] * width / 2
+        velocity_tensor[:, 2] = twist[:, 0] + twist[:, 1] * length / 2 + twist[:, 1] * width / 2
+        velocity_tensor[:, 3] = twist[:, 0] + twist[:, 1] * length / 2 - twist[:, 1] * width / 2
+        velocity_tensor = velocity_tensor.clone() / wheel_r
+
+        velocity_tensor[..., [0, 2]] *= -1
+
+        return velocity_tensor
+
+        ############## compute ped's observations #####################
     def compute_humanoid_obs(self, 
                              env: ManagerBasedEnv, 
                              asset_cfg: SceneEntityCfg = SceneEntityCfg("ped")
@@ -274,6 +323,6 @@ class PacerAction(JointAction):
 
 
 @configclass
-class PacerActionCfg(JointActionCfg):
-    class_type: type[ActionTerm] = PacerAction
+class NavWithPedActionCfg(JointActionCfg):
+    class_type: type[ActionTerm] = NavWithPedAction
     use_default_offset: bool = True

@@ -235,7 +235,7 @@ class AMPPPO(PPO):
                 self.policy.reset_noise(env.num_envs)
 
             with torch.no_grad():
-                obs_tensor = obs_as_tensor(self._last_obs, self.device)
+                obs_tensor = obs_as_tensor(self._last_obs, self.device) # type: ignore
                 actions, values, log_probs = self.policy(obs_tensor)
             actions = actions.cpu().numpy()
 

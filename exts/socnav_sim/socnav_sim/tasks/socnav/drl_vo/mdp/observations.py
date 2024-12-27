@@ -19,7 +19,7 @@ motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 num_envs = config['env']['num_envs'] # type: ignore
-num_robots = config['env']['num_robots'] # type: ignore
+
 if config['env']['task'] == 'Isaac-Drlvo': # type: ignore
     lidar_visual_cfg = VisualizationMarkersCfg(
         prim_path="/World/Visuals/LidarMarkers",
@@ -31,6 +31,8 @@ if config['env']['task'] == 'Isaac-Drlvo': # type: ignore
         }
     )
     lidar_marker = VisualizationMarkers(lidar_visual_cfg)
+
+    num_robots = config['env']['num_robots'] # type: ignore
 
 lidar_history_data = None
 
@@ -117,8 +119,14 @@ def compute_lidar_obs(env: ManagerBasedEnv,
     lidar_sensor: RTXRayCaster = env.scene.sensors[sensor_cfg.name] # type: ignore
     if lidar_sensor.data[list(lidar_sensor.data.keys())[0]][0].data.numel() != 0: # type: ignore
         lidar_data, lidar_ranges = raw_lidar_process(lidar_sensor)
-        lidar_marker.visualize(translations=(lidar_data+\
-                                             asset.data.root_pos_w[:num_robots].unsqueeze(1).repeat(1, 720, 1)).reshape(-1,3)) # type: ignore
+
+        # for lidar visualization
+        lidar_marker_pose = (lidar_data + asset.data.root_pos_w[:num_robots].unsqueeze(1).repeat(1, 720, 1))
+        Rotation_visual = quat_to_rot_matrix(asset.data.root_quat_w[:num_robots], num_robots)
+        lidar_marker_pose = torch.matmul(Rotation_visual.unsqueeze(1).repeat(1, 720, 1, 1),
+                                         lidar_marker_pose.unsqueeze(-1)).squeeze(-1).reshape(-1, 3)
+
+        lidar_marker.visualize(translations=lidar_marker_pose) # type: ignore
     else:
         lidar_ranges = torch.zeros((num_robots, 720), device='cuda:0')
 
@@ -215,3 +223,12 @@ def lidar_pooling(_lidar_current_data:torch.Tensor,
 
     else:
         return torch.ones((_num_robots, 80*80), device='cuda:0') * -1
+
+
+def compute_subgoal_obs(env: ManagerBasedEnv, 
+                        asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+                    ) -> torch.Tensor:
+    
+    # map and global path-finding to-do
+    
+    return torch.ones((env.num_envs, 2), device='cuda:0') * np.sqrt(2)

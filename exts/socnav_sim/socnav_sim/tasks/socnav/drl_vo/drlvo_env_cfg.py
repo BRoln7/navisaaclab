@@ -52,7 +52,7 @@ class DrlvoSceneCfg(InteractiveSceneCfg):
     # sensor
     lidar = RTXRayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/scout_mini/base_link/lidar",
-        offset=RTXRayCasterCfg.OffsetCfg(pos=(0.2, 0.0, 0.075), rot=(1.0, 0.0, 0.0, 0.0)),
+        offset=RTXRayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.075), rot=(1.0, 0.0, 0.0, 0.0)),
         spawn=LidarCfg(lidar_type=LidarCfg.LidarType.VELODYNE_VLS128),
         debug_vis=True,
     )
@@ -85,14 +85,12 @@ class CommandsCfg:
 class ActionsCfg:
     """Action specifications for the MDP."""
 
-    navigate = mdp.JointPositionActionCfg(
-        asset_name="robot", joint_names=[".*"], scale=1.0, offset=0.0,
+    navcmd = mdp.NavWithPedActionCfg(
+        asset_name="robot", 
+        joint_names=["front_left_wheel", "front_right_wheel"], # not stand just to use this 2 joint 
+        scale=1.0, offset=0.0,
     )
-    joint_pos = mdp.PacerActionCfg(
-        asset_name="ped", joint_names=[".*"], scale=3.1416, offset=0.0,
-    )
-
-
+    
 
 @configclass
 class ObservationsCfg:
@@ -104,7 +102,7 @@ class ObservationsCfg:
         peds_obs = ObsTerm(func=mdp.compute_peds_obs)
         lidar_obs = ObsTerm(func=mdp.compute_lidar_obs,
                             params={"sensor_cfg": SceneEntityCfg("lidar")})
-        # subgoal_obs = ObsTerm(func=mdp.compute_subgoal_obs)
+        subgoal_obs = ObsTerm(func=mdp.compute_subgoal_obs)
 
         def __post_init__(self):
             self.enable_corruption = False
@@ -128,9 +126,9 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
     # reach_goal_reward = RewTerm(mdp.compute_location_reward,
-    #                       weight=0.5)
+    #                       weight=1.0)
     # collision_reward = RewTerm(mdp.compute_power_reward,
-    #                        weight=0.5)
+    #                        weight=1.0)
     # angular_reward = RewTerm(mdp.compute_direction_reward,
     #                        weight=0.0)
     # vo_reward = RewTerm(obs_computer.compute_amp_reward,
