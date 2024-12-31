@@ -5,9 +5,9 @@ from omni.isaac.lab.actuators import ImplicitActuatorCfg
 from omni.isaac.lab.assets import ArticulationCfg
 import os
 
-jackal_wheel_radius = 0.098
-jackal_lenght = 0.262
-jackal_width = 0.37558
+wheel_radius = 0.098
+lenght = 0.262
+width = 0.37558
 
 JACKAL_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
@@ -28,7 +28,7 @@ JACKAL_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(-0., -0.,  0.),
+        pos=(-0., -0.,  0.2),
         # rot=(-0.7487, -0.0248,  0.0320, -0.6617),
     ),
     actuators={

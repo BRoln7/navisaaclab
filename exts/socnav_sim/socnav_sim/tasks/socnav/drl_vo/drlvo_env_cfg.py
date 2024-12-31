@@ -17,7 +17,7 @@ from omni.isaac.lab.managers import SceneEntityCfg
 from omni.isaac.lab.utils import configclass
 
 from socnav_sim.assets.smpl_humanoid import SMPL_HUMANOID_CFG
-from socnav_sim.assets.scout_mini import SCOUT_CFG
+from socnav_sim.assets.nova_carter import CARTER_CFG
 from socnav_sim.sensors.sensors.ray_caster import RTXRayCaster, RTXRayCasterCfg
 from socnav_sim.sensors.sim.spawners.sensors.sensors_cfg import LidarCfg
 import socnav_sim.tasks.socnav.drl_vo.mdp as mdp
@@ -47,11 +47,11 @@ class DrlvoSceneCfg(InteractiveSceneCfg):
 
     # robots
     ped: ArticulationCfg = SMPL_HUMANOID_CFG.replace(prim_path="{ENV_REGEX_NS}/Ped") # type: ignore
-    robot: ArticulationCfg = SCOUT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot") # type: ignore
+    robot: ArticulationCfg = CARTER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot") # type: ignore
     
     # sensor
     lidar = RTXRayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/scout_mini/base_link/lidar",
+        prim_path="{ENV_REGEX_NS}/Robot/nova_carter/chassis_link/Carter_Sen_Pos_Ctrl_Doc/RPLidar_S2E_03/lidar",
         offset=RTXRayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.075), rot=(1.0, 0.0, 0.0, 0.0)),
         spawn=LidarCfg(lidar_type=LidarCfg.LidarType.VELODYNE_VLS128),
         debug_vis=True,
@@ -87,7 +87,7 @@ class ActionsCfg:
 
     navcmd = mdp.NavWithPedActionCfg(
         asset_name="robot", 
-        joint_names=["front_left_wheel", "front_right_wheel"], # not stand just to use this 2 joint 
+        joint_names=["joint_wheel_right", "joint_wheel_left"], # not stand just to use this 2 joint 
         scale=1.0, offset=0.0,
     )
     
@@ -138,13 +138,12 @@ class RewardsCfg:
 class TerminationsCfg:
     """Termination terms for the MDP."""
 
-    # (1) Terminate if the trajectory ends
-    time_out = DoneTerm(func=mdp.time_out, time_out=True)
-    # (2) Terminate if the robot falls
-    # reach_goal = DoneTerm(func=mdp.reach_goal, params={"minimum_height": 0.6})
+    ############ for robots ##############
+    # (1) Terminate if the time out
+    time_out = DoneTerm(func=mdp.time_runout, time_out=True)
+    # (2) Terminate if the robot reach goal
+    reach_goal = DoneTerm(func=mdp.reach_goal, params={"goal_radius": 0.25})
 
-    ############ for peds ##############
-    torso_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.4})
 
 @configclass
 class CurriculumCfg:

@@ -3,7 +3,7 @@ from omni.isaac.lab.utils import configclass
 from omni.isaac.lab.managers.action_manager import ActionTerm, ActionTermCfg
 from omni.isaac.lab.envs import ManagerBasedEnv
 from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import dof_gym_to_sim
-import socnav_sim.assets.scout_mini as scout_robot
+import socnav_sim.assets.nova_carter as carter
 
 import torch
 from torch import nn
@@ -118,12 +118,16 @@ class NavWithPedAction(JointAction):
         vx_max = 0.5
         vz_min = -2
         vz_max = 2
+
+        # don't contrl abandon robots
+        actions[num_robots:] = 0
+        
         self._processed_actions[..., 0] = (actions[..., 0] + 1) * (vx_max - vx_min) / 2 + vx_min # lin_vel
         self._processed_actions[..., 1] = (actions[..., 1] + 1) * (vz_max - vz_min) / 2 + vz_min # ang_vel
-        self.robot_actions = self.four_wheel_differential(self._processed_actions,
-                                                          scout_robot.scout_wheel_radius,
-                                                          scout_robot.scout_lenght,
-                                                          scout_robot.scout_width)
+        self.robot_actions = carter.two_wheel_differential(self._processed_actions, 
+                                                           carter.wheel_radius,
+                                                           carter.width,
+                                                           self.num_envs)
 
     def apply_actions(self):
          ############### peds ################
@@ -141,25 +145,6 @@ class NavWithPedAction(JointAction):
                             'R_Toe_x', 'R_Toe_y', 'R_Toe_z']
         freeze_joint_idx = ped_asset.find_joints(freeze_joint_name)
         self.ped_actions[:, freeze_joint_idx[0]] = 0 # type: ignore
-
-
-    def four_wheel_differential(self, twist, wheel_r, length, width):
-        """
-        twist: [num_envs, 2-dimension twist]
-        wheel_r: radius of wheel
-        length: distance of front and rear wheel
-        width: distance of left and right wheel
-        """
-        velocity_tensor = torch.zeros(self._env.num_envs, 4).to("cuda:0")
-        velocity_tensor[:, 0] = twist[:, 0] - twist[:, 1] * length / 2 + twist[:, 1] * width / 2
-        velocity_tensor[:, 1] = twist[:, 0] - twist[:, 1] * length / 2 - twist[:, 1] * width / 2
-        velocity_tensor[:, 2] = twist[:, 0] + twist[:, 1] * length / 2 + twist[:, 1] * width / 2
-        velocity_tensor[:, 3] = twist[:, 0] + twist[:, 1] * length / 2 - twist[:, 1] * width / 2
-        velocity_tensor = velocity_tensor.clone() / wheel_r
-
-        velocity_tensor[..., [0, 2]] *= -1
-
-        return velocity_tensor
 
         ############## compute ped's observations #####################
     def compute_humanoid_obs(self, 

@@ -152,13 +152,13 @@ def spawn_lidar(
     orientation: tuple[float, float, float, float] | None = None,
 ) -> Usd.Prim:
     
-    # if 'omni.isaac.sensor' not in sys.modules:
-    #     try:
-    #         __import__('omni.isaac.sensor')
-    #     except ImportError as e:
-    #         print(f"Failed to import omni.isaac.sensor: {e}")
+    if 'omni.isaac.sensor' not in sys.modules:
+        try:
+            __import__('omni.isaac.sensor')
+        except ImportError as e:
+            print(f"Failed to import omni.isaac.sensor: {e}")
             
-    # assert 'omni.isaac.sensor' in sys.modules, "omni.isaac.sensor has not been imported, can't spawn RtxLidar"
+    assert 'omni.isaac.sensor' in sys.modules, "omni.isaac.sensor has not been imported, can't spawn RtxLidar"
 
     _, sensor = omni.kit.commands.execute(
         "IsaacSensorCreateRtxLidar",

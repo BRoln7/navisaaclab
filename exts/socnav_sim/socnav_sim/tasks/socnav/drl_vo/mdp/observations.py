@@ -34,6 +34,8 @@ if config['env']['task'] == 'Isaac-Drlvo': # type: ignore
 
     num_robots = config['env']['num_robots'] # type: ignore
 
+    goal = torch.ones((num_robots, 2), device='cuda:0') * 10
+
 lidar_history_data = None
 
 ############################ peds ############################
@@ -101,9 +103,10 @@ def quat_to_rot_matrix(quats, _num_robots):
 
 def rotation_transform(relative_positions, quats):
     m, n, _ = relative_positions.shape
-    rot_matrices = quat_to_rot_matrix(quats, m) # (num_robots, 3, 3)
+    w_Rot_r = quat_to_rot_matrix(quats, m) # (num_robots, 3, 3)
+    r_Rot_w = torch.inverse(w_Rot_r)
     relative_positions = relative_positions.unsqueeze(-1)  # (num_robots, num_peds, 3, 1)
-    transformed_positions = torch.matmul(rot_matrices.unsqueeze(1).repeat(1, n, 1, 1), 
+    transformed_positions = torch.matmul(r_Rot_w.unsqueeze(1).repeat(1, n, 1, 1), 
                                          relative_positions)  # (m, n, 3, 1)
     transformed_positions = transformed_positions[:, :, :2, 0]
 
@@ -121,10 +124,11 @@ def compute_lidar_obs(env: ManagerBasedEnv,
         lidar_data, lidar_ranges = raw_lidar_process(lidar_sensor)
 
         # for lidar visualization
-        lidar_marker_pose = (lidar_data + asset.data.root_pos_w[:num_robots].unsqueeze(1).repeat(1, 720, 1))
         Rotation_visual = quat_to_rot_matrix(asset.data.root_quat_w[:num_robots], num_robots)
         lidar_marker_pose = torch.matmul(Rotation_visual.unsqueeze(1).repeat(1, 720, 1, 1),
-                                         lidar_marker_pose.unsqueeze(-1)).squeeze(-1).reshape(-1, 3)
+                                         lidar_data.unsqueeze(-1)).squeeze(-1)
+        lidar_marker_pose = (lidar_marker_pose + \
+                             asset.data.root_pos_w[:num_robots].unsqueeze(1).repeat(1, 720, 1)).reshape(-1, 3)
 
         lidar_marker.visualize(translations=lidar_marker_pose) # type: ignore
     else:

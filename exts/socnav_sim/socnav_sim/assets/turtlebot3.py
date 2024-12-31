@@ -8,7 +8,7 @@ import os
 turtlebot_wheel_radius = 0.0332
 turtlebot_width = 0.16
 
-TURTLEBOT_CFG = ArticulationCfg(
+TURTLEBOT_CFG3 = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path=os.path.join(os.getcwd(), 'data', 'usd', 'robots', 'turtlebot3.usda'),
         rigid_props=sim_utils.RigidBodyPropertiesCfg(

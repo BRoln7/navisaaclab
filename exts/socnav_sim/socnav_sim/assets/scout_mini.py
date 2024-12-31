@@ -5,16 +5,15 @@ from omni.isaac.lab.actuators import ImplicitActuatorCfg
 from omni.isaac.lab.assets import ArticulationCfg
 import os
 
-scout_wheel_radius = 0.08
-scout_lenght = 0.465
-scout_width = 0.49
+wheel_radius = 0.08
+width = 0.513
 
 SCOUT_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=os.path.join(os.getcwd(), 'data', 'usd', 'robots', 'scout_mini.usda'),
+        usd_path=os.path.join(os.getcwd(), 'data', 'usd', 'robots', 'scout_mini_indoor.usda'),
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=None,
-            max_depenetration_velocity=1000.0,
+            max_depenetration_velocity=10.0,
             enable_gyroscopic_forces=True,
             max_linear_velocity=1000,
             max_angular_velocity=10,
