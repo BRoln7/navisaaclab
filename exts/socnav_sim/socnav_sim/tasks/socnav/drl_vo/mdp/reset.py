@@ -4,7 +4,7 @@ import torch
 from omni.isaac.lab.managers import SceneEntityCfg
 from omni.isaac.lab.assets import Articulation, RigidObject
 from omni.isaac.lab.envs import ManagerBasedRLEnv
-import socnav_sim.tasks.socnav.drl_vo.mdp.observations as obs
+import socnav_sim.tasks.socnav.drl_vo.mdp.events as events
 
 def time_runout(env: ManagerBasedRLEnv) -> torch.Tensor:
 
@@ -17,8 +17,8 @@ def reach_goal(
 ) -> torch.Tensor:
     asset: RigidObject = env.scene[asset_cfg.name]
 
-    N, _ = obs.goal.shape
-    diff_r = asset.data.root_pos_w[:N, :2] - obs.goal
+    N, _ = events.goals.shape
+    diff_r = asset.data.root_pos_w[:N, :2] - events.goals
     distance = torch.sqrt(diff_r[:,0]**2 + diff_r[:,1]**2)
     reset_ids = distance < goal_radius 
 

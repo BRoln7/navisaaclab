@@ -51,10 +51,10 @@ class DrlvoSceneCfg(InteractiveSceneCfg):
     
     # sensor
     lidar = RTXRayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/nova_carter/chassis_link/Carter_Sen_Pos_Ctrl_Doc/RPLidar_S2E_03/lidar",
-        offset=RTXRayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.075), rot=(1.0, 0.0, 0.0, 0.0)),
+        prim_path="{ENV_REGEX_NS}/Robot/nova_carter/chassis_link/lidar",
+        offset=RTXRayCasterCfg.OffsetCfg(pos=(0.05, 0.0, 0.45), rot=(1.0, 0.0, 0.0, 0.0)),
         spawn=LidarCfg(lidar_type=LidarCfg.LidarType.VELODYNE_VLS128),
-        debug_vis=True,
+        debug_vis=False,
     )
 
     # lights
@@ -66,7 +66,7 @@ class DrlvoSceneCfg(InteractiveSceneCfg):
     # scene
     scene = AssetBaseCfg(
         prim_path="/World/scene",
-        spawn=sim_utils.UsdFileCfg(usd_path=f"data/usd/scenes/warehouse.usd"),
+        spawn=sim_utils.UsdFileCfg(usd_path=f"data/usd/scenes/warehouse/warehouse.usd"),
     )
 
 ##
@@ -87,7 +87,7 @@ class ActionsCfg:
 
     navcmd = mdp.NavWithPedActionCfg(
         asset_name="robot", 
-        joint_names=["joint_wheel_right", "joint_wheel_left"], # not stand just to use this 2 joint 
+        joint_names=["joint_wheel_right", "joint_wheel_left"], # not stand just to use this 2 joint
         scale=1.0, offset=0.0,
     )
     

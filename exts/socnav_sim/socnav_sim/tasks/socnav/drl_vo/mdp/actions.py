@@ -220,19 +220,20 @@ class NavWithPedAction(JointAction):
 
         # for traj_reset
         root_pos = asset.data.root_pos_w[:, 0:3]
-        if events.amp_obs_reset is True:
+        if events.ped_fall_reset is True:
             root_pos_reset = root_pos[events.reset_env_ids, ...]
             self._traj_gen.reset(events.reset_env_ids, root_pos_reset) # type: ignore
             self.progress_buf[events.reset_env_ids] = 0 # type: ignore
-            events.amp_obs_reset = False
+            events.ped_fall_reset = False
+
         traj_ends_env_ids = (self.progress_buf == 600).nonzero(as_tuple=True)[0]
         root_pos_traj_reset = root_pos[traj_ends_env_ids, ...]
         self._traj_gen.reset(traj_ends_env_ids, root_pos_traj_reset) # type: ignore
-        self.progress_buf[traj_ends_env_ids] = 0 # type: ignore        
+        self.progress_buf[traj_ends_env_ids] = 0 # type: ignore
 
+        # compute traj_obs
         traj_samples = self._fetch_traj_samples(env)
         self.progress_buf += 1 # type: ignore
-
         root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)
         obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)
 

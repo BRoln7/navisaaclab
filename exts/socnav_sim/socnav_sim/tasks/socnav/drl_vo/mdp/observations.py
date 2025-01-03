@@ -11,6 +11,7 @@ from omni.isaac.lab.managers import SceneEntityCfg
 from socnav_sim.sensors.sensors.ray_caster import RTXRayCaster
 from omni.isaac.lab.markers import VisualizationMarkersCfg, VisualizationMarkers
 import omni.isaac.lab.sim as sim_utils
+import socnav_sim.tasks.socnav.drl_vo.mdp.events as events
 
 if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedEnv, ManagerBasedRLEnv
@@ -34,8 +35,7 @@ if config['env']['task'] == 'Isaac-Drlvo': # type: ignore
 
     num_robots = config['env']['num_robots'] # type: ignore
 
-    goal = torch.ones((num_robots, 2), device='cuda:0') * 10
-
+################# variables need be maintained ##############
 lidar_history_data = None
 
 ############################ peds ############################
@@ -232,7 +232,26 @@ def lidar_pooling(_lidar_current_data:torch.Tensor,
 def compute_subgoal_obs(env: ManagerBasedEnv, 
                         asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
                     ) -> torch.Tensor:
-    
-    # map and global path-finding to-do
-    
-    return torch.ones((env.num_envs, 2), device='cuda:0') * np.sqrt(2)
+    asset: Articulation = env.scene[asset_cfg.name]
+    quats_r = asset.data.root_quat_w[:num_robots]
+
+    nav_goal = events.goals
+    nav_diff_w = torch.cat([nav_goal - asset.data.root_pos_w[:num_robots, :2], 
+                            torch.zeros((num_robots, 1), device="cuda:0")], dim=-1)
+    m, n = nav_diff_w.shape
+    w_Rot_r = quat_to_rot_matrix(quats_r, m) # (num_robots, 3, 3)
+    r_Rot_w = torch.inverse(w_Rot_r)
+    nav_diff_r = torch.matmul(r_Rot_w, nav_diff_w.unsqueeze(-1)).squeeze(-1)[...,:2]
+
+    distance = torch.sqrt(nav_diff_r[...,0]**2 + nav_diff_r[...,1]**2)
+    sub_goal = 2 * nav_diff_r / distance
+
+    # Normalize
+    g_min = -2
+    g_max = 2
+    norm_goal = 2 * (sub_goal - g_min) / (g_max - g_min) + (-1)
+
+    if (num_envs-num_robots) > 0:
+        goal_obs = torch.cat([norm_goal, torch.zeros((num_envs-num_robots, 2),device='cuda:0')], dim=0)
+
+    return goal_obs
