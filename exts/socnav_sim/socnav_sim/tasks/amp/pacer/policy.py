@@ -184,6 +184,7 @@ class AMPPPO(PPO):
         self._disc_grad_penalty = 5
         self._disc_weight_decay = 0.0001
         self.bounds_loss_coef = 10
+        self.sym_loss_coef = 1
         self.disc_coef = 5
 
     def _store_replay_amp_obs(self, amp_obs):
@@ -381,11 +382,13 @@ class AMPPPO(PPO):
                 orig_obs_batch = torch.tensor(
                     self.rollout_buffer.observations[flip_batch_index * self.batch_size:
                                                      (flip_batch_index+1) * self.batch_size]).to("cuda:0")
-                flip_obs_batch = torch.cat([flip_obs_batch, orig_obs_batch[:, self_obs_shape:]], dim=1)
+                
+                orig_task_obs_batch = orig_obs_batch[:, self_obs_shape:]
+                flip_task_obs_batch = self.compute_flip_task_obs(orig_task_obs_batch)
+                flip_obs_batch = torch.cat([flip_obs_batch, flip_task_obs_batch], dim=1)
 
                 flip_batch_index += 1
 
-                self.sym_loss_coef = 1
                 s_info = self.sym_loss(flip_obs_batch, orig_obs_batch)
                 s_loss = s_info['sym_loss']
                 s_loss = torch.mean(s_loss)
@@ -594,13 +597,35 @@ class AMPPPO(PPO):
         b_loss = (mu_loss_low + mu_loss_high).sum(axis=-1) # type: ignore
 
         return b_loss
-    
+
+    def compute_flip_task_obs(self, normal_task_obs):
+
+        # location_obs  20
+        # Terrain obs: self.num_terrain_obs
+        B, D = normal_task_obs.shape
+        traj_samples_dim = 20
+        obs_acc = []
+        normal_task_obs = normal_task_obs.clone()
+        traj_samples = normal_task_obs[:, :traj_samples_dim].view(B, 10, 2)
+        traj_samples[..., 1] *= -1
+        obs_acc.append(traj_samples.view(B, -1))
+
+        height_samples = normal_task_obs[..., traj_samples_dim:].view(B, int(np.sqrt(256)), int(np.sqrt(256)))
+        height_samples = height_samples.flip(2)
+        obs_acc.append(height_samples.view(B, -1))
+
+        obs = torch.cat(obs_acc, dim=1)
+
+        del obs_acc
+
+        return obs
+
     def sym_loss(self, flip_obs_batch, orig_obs_batch):
         B, _ = flip_obs_batch.shape
 
         left_to_right_index = flip_loss_left_to_right_index
-        flip_a, flip_s, _ = self.policy.forward(flip_obs_batch, deterministic=True)
-        orig_a, orig_s, _ = self.policy.forward(orig_obs_batch, deterministic=True)
+        flip_a = self.policy.action_net(self.policy.mlp_extractor.policy_net((self.policy.features_extractor(flip_obs_batch))))
+        orig_a = self.policy.action_net(self.policy.mlp_extractor.policy_net((self.policy.features_extractor(orig_obs_batch))))
 
         orig_a = orig_a.view(B, -1, 3)
         orig_a[..., 0] *= -1
@@ -611,7 +636,7 @@ class AMPPPO(PPO):
         sym_loss = sym_loss.pow(2).mean(dim = -1) * 50
         return {'sym_loss': sym_loss}
 
-    
+   
     def dropout_amp_obs(self, amp_obs, dropout_mask):
         return amp_obs * dropout_mask
 

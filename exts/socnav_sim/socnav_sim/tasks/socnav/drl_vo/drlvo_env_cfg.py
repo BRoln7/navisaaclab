@@ -20,9 +20,10 @@ from socnav_sim.assets.smpl_humanoid import SMPL_HUMANOID_CFG
 from socnav_sim.assets.nova_carter import CARTER_CFG
 from socnav_sim.sensors.sensors.ray_caster import RTXRayCaster, RTXRayCasterCfg
 from socnav_sim.sensors.sim.spawners.sensors.sensors_cfg import LidarCfg
-import socnav_sim.tasks.socnav.drl_vo.mdp as mdp
+from socnav_sim.tasks.socnav.nav_utils import action_base, event_base, reset_base
 from omni.isaac.lab.actuators import ImplicitActuatorCfg
 
+import socnav_sim.tasks.socnav.drl_vo.mdp as mdp
 ##
 # Scene definition
 ##
@@ -85,7 +86,7 @@ class CommandsCfg:
 class ActionsCfg:
     """Action specifications for the MDP."""
 
-    navcmd = mdp.NavWithPedActionCfg(
+    navcmd = action_base.NavWithPedActionCfg(
         asset_name="robot", 
         joint_names=["joint_wheel_right", "joint_wheel_left"], # not stand just to use this 2 joint
         scale=1.0, offset=0.0,
@@ -117,7 +118,7 @@ class EventCfg:
     """Configuration for events."""
 
     reset_base = EventTerm(
-        func=mdp.reset_init_state_amp_motion,
+        func=event_base.reset_init_state_amp_motion,
         mode="reset",
     )
 
@@ -140,10 +141,12 @@ class TerminationsCfg:
 
     ############ for robots ##############
     # (1) Terminate if the time out
-    time_out = DoneTerm(func=mdp.time_runout, time_out=True)
+    time_out = DoneTerm(func=reset_base.time_runout, time_out=True)
     # (2) Terminate if the robot reach goal
-    reach_goal = DoneTerm(func=mdp.reach_goal, params={"goal_radius": 0.25})
+    reach_goal = DoneTerm(func=reset_base.reach_goal, params={"goal_radius": 0.25})
 
+    ############# for peds ###############
+    ped_fall = DoneTerm(func=reset_base.ped_fall)
 
 @configclass
 class CurriculumCfg:
@@ -175,7 +178,6 @@ class DrlvoEnvCfg(ManagerBasedRLEnvCfg):
         self.episode_length_s = 20
         # simulation settings
         self.sim.dt = 1 / 120.0
-
         self.sim.render_interval = self.decimation
         self.sim.physx.bounce_threshold_velocity = 0.2
         self.sim.physx.max_position_iteration_count = 4

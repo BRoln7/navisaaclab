@@ -11,30 +11,30 @@ from omni.isaac.lab.managers import SceneEntityCfg
 from socnav_sim.sensors.sensors.ray_caster import RTXRayCaster
 from omni.isaac.lab.markers import VisualizationMarkersCfg, VisualizationMarkers
 import omni.isaac.lab.sim as sim_utils
-import socnav_sim.tasks.socnav.drl_vo.mdp.events as events
+import socnav_sim.tasks.socnav.nav_utils.event_base as events
 
 if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedEnv, ManagerBasedRLEnv
 
-motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
-with open(motion_file, 'r') as file:
-    config = yaml.safe_load(file)
-num_envs = config['env']['num_envs'] # type: ignore
-
-if config['env']['task'] == 'Isaac-Drlvo': # type: ignore
-    lidar_visual_cfg = VisualizationMarkersCfg(
-        prim_path="/World/Visuals/LidarMarkers",
-        markers={
-            "lidar": sim_utils.SphereCfg(
-                radius=0.02,
-                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0))
-            )
-        }
-    )
-    lidar_marker = VisualizationMarkers(lidar_visual_cfg)
-
-    num_robots = config['env']['num_robots'] # type: ignore
-
+def config_init():
+    motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
+    with open(motion_file, 'r') as file:
+        config = yaml.safe_load(file)
+    if config['env']['task'] == 'Isaac-Drlvo': # type: ignore
+        global lidar_marker, num_envs, num_robots
+        lidar_visual_cfg = VisualizationMarkersCfg(
+            prim_path="/World/Visuals/LidarMarkers",
+            markers={
+                "lidar": sim_utils.SphereCfg(
+                    radius=0.02,
+                    visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0))
+                )
+            }
+        )
+        lidar_marker = VisualizationMarkers(lidar_visual_cfg)
+        num_envs = config['env']['num_envs'] # type: ignore
+        num_robots = config['env']['num_robots'] # type: ignore
+config_init()
 ################# variables need be maintained ##############
 lidar_history_data = None
 
@@ -244,7 +244,7 @@ def compute_subgoal_obs(env: ManagerBasedEnv,
     nav_diff_r = torch.matmul(r_Rot_w, nav_diff_w.unsqueeze(-1)).squeeze(-1)[...,:2]
 
     distance = torch.sqrt(nav_diff_r[...,0]**2 + nav_diff_r[...,1]**2)
-    sub_goal = 2 * nav_diff_r / distance
+    sub_goal = 2 * nav_diff_r / distance.unsqueeze(-1).repeat(1, 2)
 
     # Normalize
     g_min = -2

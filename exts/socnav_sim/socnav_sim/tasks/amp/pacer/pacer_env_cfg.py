@@ -121,7 +121,7 @@ class TerminationsCfg:
     # (1) Terminate if the trajectory ends
     trajectory_end = DoneTerm(func=mdp.time_out, time_out=True)
     # (2) Terminate if the robot falls
-    Pelvis_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.15})
+    Pelvis_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.40})
     # (3) Terminate if the robot can't follow trajectory
     traj_fail = DoneTerm(func=mdp.far_from_traj, params={"maximum_distance": 3.0})
 

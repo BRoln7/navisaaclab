@@ -16,7 +16,7 @@ parser.add_argument("--checkpoint", type=str, default=config['training']['checkp
 parser.add_argument(
     "--use_last_checkpoint",
     action="store_true",
-    help="When no checkpoint provided, use the last saved model. Otherwise use the best saved model.",
+    help="When no checkpoint provided, use the last saved model. Otherwise use the best saved model."
 )
 
 AppLauncher.add_app_launcher_args(parser)
@@ -91,7 +91,7 @@ def main():
         agent = AMPPPO.load(checkpoint_path, env, print_system_info=True)
 
     with torch.no_grad():
-        agent.policy.log_std.fill_(np.float64(-2.9))
+        agent.policy.log_std.fill_(np.float64(-2.9)) # type: ignore
     agent.policy.log_std.requires_grad = False
 
     new_logger = configure(log_dir, ["stdout", "tensorboard"])

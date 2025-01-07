@@ -39,8 +39,6 @@ if TYPE_CHECKING:
 motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
-num_envs = config['env']['num_envs'] # type: ignore
-
 if config['env']['task'] == 'Isaac-Pacer': # type: ignore
     trajectory_cfg = VisualizationMarkersCfg(
         prim_path="/World/Visuals/TrajectoryMarkers",
@@ -48,11 +46,10 @@ if config['env']['task'] == 'Isaac-Pacer': # type: ignore
             "waypoints": sim_utils.SphereCfg(
                 radius=0.05,
                 visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.5))
-            )
-        }
-    )
+            )})
     trajectory_marker = VisualizationMarkers(trajectory_cfg)
     traj_speed = config['env']['traj_speed'] # type: ignore
+    num_envs = config['env']['num_envs'] # type: ignore
 
 # config params
 amp_obs_shape = 1950
