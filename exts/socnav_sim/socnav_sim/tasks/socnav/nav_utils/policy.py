@@ -14,7 +14,7 @@ from gymnasium import spaces
 motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
-if config['env']['task'] == 'Isaac-Drlvo': # type: ignore
+if config['env']['task'] != 'Isaac-Pacer': # type: ignore
     num_robots = config['env']['num_robots'] # type: ignore
 
 

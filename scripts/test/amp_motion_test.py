@@ -37,42 +37,8 @@ from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import rot_wxyz_to_xyzw
 ##
 from socnav_sim.assets.smpl_humanoid import SMPL_HUMANOID_CFG
 
-from omni.isaac.lab.markers import VisualizationMarkersCfg, VisualizationMarkers
 import omni.isaac.lab.sim as sim_utils
-from scipy.spatial.transform import Rotation as R
 
-class Traj():
-    def __init__(self) -> None:
-        self.trajectory_cfg = VisualizationMarkersCfg(
-            prim_path="/World/Visuals/TrajectoryMarkers",
-            markers={
-                "marker": sim_utils.SphereCfg(
-                    radius=0.05,
-                    visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 0.2)),
-                    ),
-                }
-            )
-        self.traj_marker = VisualizationMarkers(self.trajectory_cfg)
-        self.traj_pos = torch.tensor([.0, .0, .0]).to('cuda:0')
-        self.yaw = torch.tensor([0]).to("cuda:0")
-
-    def reset_traj(self, q:torch.tensor):
-        rotation = R.from_quat(q.cpu())
-        self.yaw = torch.tensor(rotation.as_euler('xyz', degrees=False)).to("cuda:0")[0, 2]
-
-    def update(self, key:str):
-        if key == 'fast':
-            step = 0.025
-        elif key == 'medium':
-            step = 0.02
-        else:
-            step = 0.01
-        self.traj_pos += torch.tensor([step * torch.cos(self.yaw),
-                                        step * torch.sin(self.yaw),
-                                        0.0], device='cuda:0')                               
-        self.traj_marker.visualize(self.traj_pos)
-
-traj_visual = Traj()
 
 def design_scene() -> tuple[dict, list[list[float]]]:
     """Designs the scene."""
@@ -105,20 +71,16 @@ def reset_init_state(asset:Articulation):
     asset.write_joint_state_to_sim(position=dof_pos[:,dof_gym_to_sim],\
                                     velocity=dof_vel[:,dof_gym_to_sim])
     
-    # traj_visual.traj_pos = torch.tensor([[root_pos[..., 0], root_pos[..., 1], 0.0]]).to('cuda:0')
-    # traj_visual.reset_traj(root_rot)
-    # traj_visual.traj_marker.visualize(translations=traj_visual.traj_pos)
-    
     return motion_ids, motion_times
 
 
 def reset_amp_motion(motion_ids, motion_times):
-    dt = 1 / 30
+    dt = 1 / 60
 
-    motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, 100])
+    motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, 500])
     motion_times = motion_times.unsqueeze(-1)
 
-    time_steps = dt * (torch.arange(0, 100, device='cuda:0') + 1)
+    time_steps = dt * (torch.arange(0, 500, device='cuda:0') + 1)
     motion_times = motion_times + time_steps
 
     motion_ids = motion_ids.view(-1)
@@ -136,26 +98,6 @@ def reset_amp_motion(motion_ids, motion_times):
     return root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel
     
 
-# def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articulation], origins: torch.Tensor):
-#     """Runs the simulation loop."""
-#     robot = entities["amp"]
-#     sim_dt = 1 / 120
-#     wxyz_to_xyzw = [3, 0, 1, 2]
-#     while simulation_app.is_running():
-#         amp_record_state = torch.load('record_amp_state.pt')
-#         # motion_ids, motion_times = reset_init_state(robot)
-#         robot.reset()
-#         print("[INFO]: Resetting robot state...")
-#         # root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel = reset_amp_motion(motion_ids, motion_times)
-#         for i in range(amp_record_state.size(0)):
-#             robot.write_root_pose_to_sim(torch.cat([amp_record_state[i,0,:3], amp_record_state[i,0,3:7][wxyz_to_xyzw]], dim=-1)) # type: ignore
-#             robot.write_root_velocity_to_sim(torch.cat([amp_record_state[i,0,7:10], amp_record_state[i,0,10:13]], dim=0)) # type: ignore
-#             robot.write_joint_state_to_sim(position=amp_record_state[i,0,13:82][dof_gym_to_sim],\
-#                                 velocity=amp_record_state[i,0,82:151][dof_gym_to_sim]) # type: ignore
-#             # traj_visual.update('fast')
-#             sim.step()
-#             robot.update(sim_dt)
-
 def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articulation], origins: torch.Tensor):
     """Runs the simulation loop."""
     robot = entities["amp"]
@@ -171,7 +113,6 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
             robot.write_root_velocity_to_sim(torch.cat([root_vel[i], root_ang_vel[i]], dim=0)) # type: ignore
             robot.write_joint_state_to_sim(position=dof_pos[:, dof_gym_to_sim][i],\
                                 velocity=dof_vel[:,dof_gym_to_sim][i]) # type: ignore
-            # traj_visual.update('fast')
             sim.step()
             robot.update(sim_dt)
 

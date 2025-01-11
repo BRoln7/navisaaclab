@@ -39,6 +39,7 @@ if TYPE_CHECKING:
 motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
+num_envs = config['env']['num_envs'] # type: ignore
 if config['env']['task'] == 'Isaac-Pacer': # type: ignore
     trajectory_cfg = VisualizationMarkersCfg(
         prim_path="/World/Visuals/TrajectoryMarkers",
@@ -49,7 +50,7 @@ if config['env']['task'] == 'Isaac-Pacer': # type: ignore
             )})
     trajectory_marker = VisualizationMarkers(trajectory_cfg)
     traj_speed = config['env']['traj_speed'] # type: ignore
-    num_envs = config['env']['num_envs'] # type: ignore
+    amp_step_dt = config['env']['amp_dt'] # type: ignore
 
 # config params
 amp_obs_shape = 1950
@@ -153,7 +154,7 @@ class ObsComputer():
                               asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
         asset: Articulation = env.scene[asset_cfg.name]
         
-        episode_dur = env.max_episode_length * env.physics_dt * traj_speed # type: ignore
+        episode_dur = env.max_episode_length * env.physics_dt * 4.00 # type: ignore
         num_verts = 101
         dtheta_max = 2.0
         self._traj_gen = traj_generator.TrajGenerator(env.num_envs, episode_dur, num_verts,
@@ -338,7 +339,7 @@ class ObsComputer():
         return reward
         
     def reset_amp_obs(self, env_ids, motion_ids, motion_times, env: ManagerBasedEnv):
-        dt = 1 / 30
+        dt = amp_step_dt
 
         motion_ids = motion_ids[env_ids]
         motion_times = motion_times[env_ids]

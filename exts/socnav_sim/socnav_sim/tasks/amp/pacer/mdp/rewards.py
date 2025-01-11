@@ -15,8 +15,8 @@ with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 if config['env']['task'] == 'Isaac-Pacer': # type: ignore
     traj_speed = config['env']['traj_speed'] # type: ignore
-    # direction_coefficient = traj_speed
-    direction_coefficient = 1.5
+    direction_coefficient = traj_speed
+    # direction_coefficient = 1.5
 
 power_coefficient = 0.0005
 

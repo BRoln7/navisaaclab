@@ -39,6 +39,7 @@ num_envs = config['env']['num_envs'] # type: ignore
 if config['env']['task'] == 'Isaac-Pacer': # type: ignore
     global motion_load
     motion_load = MotionLoad(num_envs)
+    amp_step_dt = config['env']['amp_dt'] # type: ignore
 
 ###################################################
 ################## preprocess #####################
@@ -106,7 +107,7 @@ class AMPDemoBuffer():
     
     def build_amp_obs_demo(self, motion_ids, motion_times0):
         # Compute observation for the motion starting point
-        dt = 1 / 30
+        dt = amp_step_dt
         motion_ids = torch.tile(motion_ids.unsqueeze(-1),[1, self.num_amp_obs_steps])
 
         motion_times = motion_times0.unsqueeze(-1)

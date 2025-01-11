@@ -30,8 +30,8 @@ def config_init():
     motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
     with open(motion_file, 'r') as file:
         config = yaml.safe_load(file)
-    if config['env']['task'] == 'Isaac-Drlvo': # type: ignore
-        global trajectory_marker, actions_path, num_envs, num_robots
+    if config['env']['task'] != 'Isaac-Pacer': # type: ignore
+        global trajectory_marker, actions_path, num_envs, num_robots, traj_speed
         trajectory_cfg = VisualizationMarkersCfg(
             prim_path="/World/Visuals/TrajectoryMarkers",
             markers={"waypoints": sim_utils.SphereCfg(
@@ -41,6 +41,7 @@ def config_init():
         actions_path = os.path.join(os.getcwd(), 'data', 'checkpoints', 'actions_policy.pth')
         num_envs = config['env']['num_envs'] # type: ignore
         num_robots = config['env']['num_robots'] # type: ignore
+        traj_speed = config['env']['traj_speed'] # type: ignore
 config_init()
 
 
@@ -169,7 +170,7 @@ class NavWithPedAction(JointAction):
                               asset_cfg: SceneEntityCfg = SceneEntityCfg("ped")):
         asset: Articulation = env.scene[asset_cfg.name]
         
-        episode_dur = env.max_episode_length * env.physics_dt * 1.78 # type: ignore
+        episode_dur = env.max_episode_length * env.physics_dt * traj_speed # type: ignore
         num_verts = 101
         dtheta_max = 2.0
         self._traj_gen = traj_generator.TrajGenerator(env.num_envs, episode_dur, num_verts,
@@ -191,7 +192,7 @@ class NavWithPedAction(JointAction):
         # 5 seconds with 0.5 second intervals, 10 samples.
         env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long) # type: ignore
 
-        timestep_beg = self.progress_buf[env_ids] * env.physics_dt * 1.78 # type: ignore
+        timestep_beg = self.progress_buf[env_ids] * env.physics_dt * traj_speed # type: ignore
         
         timesteps = torch.arange(self._num_traj_samples, device=env.device, dtype=torch.float)
         timesteps = timesteps * self._traj_sample_timestep

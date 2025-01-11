@@ -14,7 +14,7 @@ def config_init():
     motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
     with open(motion_file, 'r') as file:
         config = yaml.safe_load(file)
-    if config['env']['task'] == 'Isaac-Drlvo': # type: ignore
+    if config['env']['task'] != 'Isaac-Pacer': # type: ignore
         global num_envs, motion_load, num_robots, goal_marker, robot_init, ped_init, map_path, yaml_path, goals
 
         num_envs = config['env']['num_envs'] # type: ignore
