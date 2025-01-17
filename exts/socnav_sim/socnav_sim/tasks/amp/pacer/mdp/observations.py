@@ -9,6 +9,7 @@ import torch
 import numpy as np
 import os
 import yaml
+import random
 from typing import TYPE_CHECKING
 
 from omni.isaac.lab.assets import Articulation
@@ -58,6 +59,15 @@ amp_obs_shape_step = 195
 amp_replay_obs = torch.tensor([]).to("cuda:0")
 flip_humanoid_obs = None
 tar_pos: torch.Tensor = None # type: ignore
+
+SEED = 4801
+seed = 0
+random.seed(seed)
+np.random.seed(SEED)
+torch.manual_seed(seed)
+os.environ['PYTHONHASHSEED'] = str(seed)
+torch.cuda.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
 
 #########################################################################################
 ##################################### function for obs ################################## 
@@ -154,7 +164,7 @@ class ObsComputer():
                               asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
         asset: Articulation = env.scene[asset_cfg.name]
         
-        episode_dur = env.max_episode_length * env.physics_dt * 4.00 # type: ignore
+        episode_dur = env.max_episode_length * env.physics_dt * traj_speed # type: ignore
         num_verts = 101
         dtheta_max = 2.0
         self._traj_gen = traj_generator.TrajGenerator(env.num_envs, episode_dur, num_verts,
@@ -339,7 +349,8 @@ class ObsComputer():
         return reward
         
     def reset_amp_obs(self, env_ids, motion_ids, motion_times, env: ManagerBasedEnv):
-        dt = amp_step_dt
+        # dt = amp_step_dt
+        dt = 1/30
 
         motion_ids = motion_ids[env_ids]
         motion_times = motion_times[env_ids]

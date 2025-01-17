@@ -10,6 +10,7 @@ with open(motion_file, 'r') as file:
 parser = argparse.ArgumentParser(description="Train an RL agent for amp task.")
 parser.add_argument("--num_envs", type=int, default=config['env']['num_envs'], help="Number of environments to simulate.") # type: ignore
 parser.add_argument("--task", type=str, default=config['env']['task'], help="Name of the task.") # type: ignore
+parser.add_argument("--method", type=str, default=config['env']['method'], help="Name of the method.") # type: ignore
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
 parser.add_argument("--checkpoint", type=str, default=config['training']['checkpoint'], help="Path to model checkpoint.") # type: ignore
@@ -35,7 +36,8 @@ import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 import socnav_sim.tasks
-from socnav_sim.tasks.socnav.nav_utils.policy import MRPPO
+from socnav_sim.tasks.socnav.nav_utils.policy_base import MRPPO
+from socnav_sim.tasks.socnav.crowdnav.policy import CadrlEncoder, SarlEncoder
 import os
 
 def main():
@@ -79,11 +81,17 @@ def main():
         shape= env.action_space.shape,
     )
 
-    policy_kwargs = dict(
-    # features_extractor_class,
-    # features_extractor_kwargs = dict(features_dim=256),
-    net_arch=dict(pi=[256, 256], vf=[128, 128]),
-    )
+    if args_cli.method == 'Cadrl':
+        policy_kwargs = dict(
+        features_extractor_class = CadrlEncoder,
+        net_arch=dict(pi=[256, 256], vf=[128, 128]),
+        )
+
+    elif args_cli.method == 'Sarl':
+        policy_kwargs = dict(
+        features_extractor_class = SarlEncoder,
+        net_arch=dict(pi=[256, 256], vf=[128, 128]),
+        )
 
     agent = MRPPO(policy_arch, env, verbose=2, **agent_cfg, policy_kwargs=policy_kwargs)
     new_logger = configure(log_dir, ["stdout", "tensorboard"])

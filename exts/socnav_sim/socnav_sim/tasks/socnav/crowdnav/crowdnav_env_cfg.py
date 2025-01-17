@@ -48,15 +48,17 @@ class CrowdnavSceneCfg(InteractiveSceneCfg):
     robot: ArticulationCfg = CARTER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot") # type: ignore
 
     # lights
-    light = AssetBaseCfg(
-        prim_path="/World/light",
-        spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=5000.0),
-    )
+    # light = AssetBaseCfg(
+    #     prim_path="/World/light",
+    #     spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=2000.0),
+    # )
 
     # scene
     scene = AssetBaseCfg(
         prim_path="/World/scene",
-        spawn=sim_utils.UsdFileCfg(usd_path=f"data/usd/scenes/warehouse/warehouse.usd"),
+        init_state=AssetBaseCfg.InitialStateCfg(
+            pos=(0, 0, -0.05)),
+        spawn=sim_utils.UsdFileCfg(usd_path=f"data/usd/scenes/scene_crowdnav/scene_crowdnav.usd"),
     )
 
 ##
@@ -112,10 +114,10 @@ class EventCfg:
 @configclass
 class RewardsCfg:
     """Reward terms for the MDP."""
-    # reach_goal_reward = RewTerm(mdp.compute_goal_reward,
-    #                       weight=1.0)
-    # collision_reward = RewTerm(mdp.compute_collision_reward,
-    #                        weight=1.0)
+    reach_goal_reward = RewTerm(mdp.compute_goal_reward,
+                          weight=1.0)
+    collision_reward = RewTerm(mdp.compute_collision_reward,
+                           weight=1.0)
 
 @configclass
 class TerminationsCfg:
@@ -128,7 +130,7 @@ class TerminationsCfg:
     reach_goal = DoneTerm(func=reset_base.reach_goal, params={"goal_radius": 0.25})
 
     ############# for peds ###############
-    ped_fall = DoneTerm(func=reset_base.ped_fall)
+    ped_fall = DoneTerm(func=reset_base.ped_reset)
 
 @configclass
 class CurriculumCfg:

@@ -41,7 +41,7 @@ def compute_joint_states_obs(env: ManagerBasedEnv,
     w_vel_r = robot.data.root_vel_w[:num_robots]
     
     # robot state
-    goal_r = event.goals - w_pos_r[..., :2]
+    goal_r = event.goals_r_w - w_pos_r[..., :2]
     dg = torch.sqrt(goal_r[:,0]**2 + goal_r[:,1]**2).unsqueeze(-1)
     v_pref = w_vel_r[:,0].unsqueeze(-1)
     alpha = w_vel_r[:,-1].unsqueeze(-1)
@@ -77,6 +77,12 @@ def compute_joint_states_obs(env: ManagerBasedEnv,
     nearest_ped_state = sorted_ped_state[:, :4].reshape(num_robots, -1)
 
     joint_state = torch.cat([robot_state, nearest_ped_state], dim=-1)
+
+    global d_min
+    d_min = joint_state[:, 11]
+
+    _, N = joint_state.shape
+    joint_state = torch.cat([joint_state, torch.ones(num_envs-num_robots, N, device='cuda:0')], dim=0)
 
     return joint_state
 

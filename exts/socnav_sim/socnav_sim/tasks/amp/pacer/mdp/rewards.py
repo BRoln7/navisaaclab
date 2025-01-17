@@ -16,7 +16,6 @@ with open(motion_file, 'r') as file:
 if config['env']['task'] == 'Isaac-Pacer': # type: ignore
     traj_speed = config['env']['traj_speed'] # type: ignore
     direction_coefficient = traj_speed
-    # direction_coefficient = 1.5
 
 power_coefficient = 0.0005
 
@@ -28,7 +27,11 @@ def compute_location_reward(env: ManagerBasedEnv,
     root_pos = asset.data.root_pos_w[:, :3]
     if obs.tar_pos is None:
         return torch.zeros(env.num_envs).to("cuda:0")
+    
     location_reward = compute_location_rew(root_pos, obs.tar_pos)
+    # lin_vel_x = asset.data.root_lin_vel_b[:, 0]
+    # direct_fail_ids = torch.nonzero(lin_vel_x < 0)
+    # location_reward[direct_fail_ids] = 0
 
     return location_reward
     

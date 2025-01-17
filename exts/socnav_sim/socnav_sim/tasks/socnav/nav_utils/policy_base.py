@@ -114,7 +114,7 @@ class MRPPO(PPO):
             self._last_episode_starts = dones
 
         with torch.no_grad():
-            values = self.policy.predict_values(obs_as_tensor(new_obs[:num_robots], self.device))  # type: ignore[arg-type]
+            values = self.policy.predict_values(obs_as_tensor(new_obs, self.device))[:num_robots] # type: ignore[arg-type]
         dones = dones[:num_robots]
         
         rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)

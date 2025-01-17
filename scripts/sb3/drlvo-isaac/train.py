@@ -38,7 +38,7 @@ import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils import load_cfg_from_registry, parse_env_cfg
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 import socnav_sim.tasks
-from socnav_sim.tasks.socnav.nav_utils.policy import MRPPO
+from socnav_sim.tasks.socnav.nav_utils.policy_base import MRPPO
 from custom_cnn_full import CustomCNN
 import os
 

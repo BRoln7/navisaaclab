@@ -34,13 +34,20 @@ class PacerSceneCfg(InteractiveSceneCfg):
         collision_group=-1,
         terrain_type="plane",
         visual_material = sim_utils.PreviewSurfaceCfg(
-            diffuse_color=(0.4, 0.6, 0.95)
+            diffuse_color = (0.0, 0.0, 0.0),
+            opacity = 0
         ),
         physics_material=sim_utils.RigidBodyMaterialCfg(
             static_friction=1.0,
             dynamic_friction=1.0,
         ),
     )
+
+    # ground = AssetBaseCfg(
+    #     prim_path="/World/ground",
+    #     spawn=sim_utils.GroundPlaneCfg(size=(200.0, 200.0),
+    #                                    color=(0.7, 0.7, 0.7)),
+    # )
 
     # robots
     robot: ArticulationCfg = SMPL_HUMANOID_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot") # type: ignore
@@ -50,6 +57,16 @@ class PacerSceneCfg(InteractiveSceneCfg):
         prim_path="/World/light",
         spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
+
+    # scene
+    # scene = AssetBaseCfg(
+    #     prim_path="/World/scene",
+    #     init_state=AssetBaseCfg.InitialStateCfg(
+    #         pos=(0, -7, -0.1)),
+    #     spawn=sim_utils.UsdFileCfg(
+    #         usd_path=f"/home/social-navigation/data/Omnigibson scenes/Collected_scene_1/scene_1.usd",
+    #         ),
+    # )
 
 
 ##
@@ -121,9 +138,9 @@ class TerminationsCfg:
     # (1) Terminate if the trajectory ends
     trajectory_end = DoneTerm(func=mdp.time_out, time_out=True)
     # (2) Terminate if the robot falls
-    Pelvis_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.50})
+    Pelvis_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.60})
     # (3) Terminate if the robot can't follow trajectory
-    # traj_fail = DoneTerm(func=mdp.far_from_traj, params={"maximum_distance": 3.0})
+    # traj_fail = DoneTerm(func=mdp.far_from_traj, params={"maximum_distance": 4.0})
 
 
 @configclass
@@ -138,7 +155,7 @@ class PacerEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the MuJoCo-style Humanoid walking environment."""
 
     # Scene settings
-    scene: PacerSceneCfg = PacerSceneCfg(num_envs=8, env_spacing=6)
+    scene: PacerSceneCfg = PacerSceneCfg(num_envs=8, env_spacing=3)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()

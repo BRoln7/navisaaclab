@@ -35,7 +35,7 @@ import torch
 
 from omni.isaac.lab_tasks.utils.parse_cfg import load_cfg_from_registry, parse_env_cfg, get_checkpoint_path
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
-from socnav_sim.tasks.socnav.nav_utils.policy import MRPPO
+from socnav_sim.tasks.socnav.nav_utils.policy_base import MRPPO
 import socnav_sim.tasks  # noqa: F401
 
 def main():

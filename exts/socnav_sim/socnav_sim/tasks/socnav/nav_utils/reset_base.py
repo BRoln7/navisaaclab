@@ -20,8 +20,8 @@ def reach_goal(
 ) -> torch.Tensor:
     asset: RigidObject = env.scene[asset_cfg.name]
 
-    N, _ = events.goals.shape
-    diff_r = asset.data.root_pos_w[:N, :2] - events.goals
+    N, _ = events.goals_r_w.shape
+    diff_r = asset.data.root_pos_w[:N, :2] - events.goals_r_w
     distance = torch.sqrt(diff_r[:,0]**2 + diff_r[:,1]**2)
     reset_ids = distance < goal_radius 
 
@@ -29,28 +29,30 @@ def reach_goal(
 
     return reset_ids
 
-def ped_fall(
+def ped_reset(
         env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("ped")
 ) -> torch.Tensor:
+    
     ped_asset: RigidObject = env.scene[asset_cfg.name]
+    wxyz_to_xyzw = [3, 0, 1, 2]
+    motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, \
+    root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = events.motion_load.sample_ref_state(env.num_envs)
 
+    # for fall-reset
     ped_reset_ids = ped_asset.data.root_state_w[:, 2] < 0.4
     ped_reset_ids = torch.nonzero(ped_reset_ids).squeeze(-1)
 
     if ped_reset_ids.numel() != 0:
-        wxyz_to_xyzw = [3, 0, 1, 2]
-        motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, \
-        root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = events.motion_load.sample_ref_state(env.num_envs)
-        root_pos += env.scene.env_origins
-        ped_asset.write_root_pose_to_sim(torch.cat([root_pos[ped_reset_ids], 
+        # root_pos += env.scene.env_origins
+        ped_asset.write_root_pose_to_sim(torch.cat([events.spawn_p_w_3d[ped_reset_ids], 
                                                     root_rot[:, wxyz_to_xyzw][ped_reset_ids]], dim=-1), 
                                                     env_ids=ped_reset_ids) # type: ignore
         ped_asset.write_root_velocity_to_sim(torch.cat([root_vel[ped_reset_ids], 
                                                         root_ang_vel[ped_reset_ids]], dim=-1), 
                                                         env_ids=ped_reset_ids) # type: ignore
         ped_asset.write_joint_state_to_sim(position=dof_pos[:,dof_gym_to_sim][ped_reset_ids],  # type: ignore
-                                        velocity=dof_vel[:,dof_gym_to_sim][ped_reset_ids], 
-                                        env_ids=ped_reset_ids) # type: ignore
+                                           velocity=dof_vel[:,dof_gym_to_sim][ped_reset_ids], 
+                                           env_ids=ped_reset_ids) # type: ignore
         global ped_fall_reset
         ped_fall_reset = True
         global reset_env_ids

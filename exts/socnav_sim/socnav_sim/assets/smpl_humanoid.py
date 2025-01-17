@@ -6,12 +6,10 @@ from omni.isaac.lab.assets import ArticulationCfg
 import os
 
 SMPL_HUMANOID_CFG = ArticulationCfg(
-    spawn=sim_utils.MultiUsdFileCfg(
-        usd_path=[
-            f"data/usd/robots/smpl_humanoid_purple.usda",
-            f"data/usd/robots/smpl_humanoid.usda",
-        ],
-        random_choice=True,
+    spawn=sim_utils.UsdFileCfg(
+        # usd_path=f"data/usd/robots/smpl_humanoid_vis.usda",
+        # usd_path=f"data/usd/robots/smpl_humanoid.usda",
+        usd_path=f"data/usd/robots/smpl_humanoid_vis_mass.usd",
         copy_from_source=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=None,
@@ -69,3 +67,41 @@ SMPL_HUMANOID_CFG = ArticulationCfg(
             },
    ),}
 )
+
+'''
+body_mass
+
+['Pelvis',
+ 'L_Hip',
+ 'R_Hip', 
+ 'Torso', 
+ 'L_Knee', 
+ 'R_Knee', 
+'Spine', 
+'L_Ankle', 
+'R_Ankle', 
+'Chest', 
+'L_Toe', 
+'R_Toe', 
+'Neck', 
+'L_Thorax', 
+'R_Thorax', 
+'Head', 
+'L_Shoulder', 
+'R_Shoulder', 
+'L_Elbow', 
+'R_Elbow', 
+'L_Wrist', 
+'R_Wrist', 'L_Hand', 'R_Hand']
+
+smpl
+[5.1249, 3.6615, 3.5949, 2.1559, 2.8735, 2.8748, 1.9085, 1.5240, 1.5976,
+4.7059, 0.3793, 0.4081, 0.6445, 1.0855, 1.0598, 4.2519, 1.8960, 1.9828,
+1.0497, 1.0857, 0.2981, 0.3164, 0.3978, 0.4076]
+
+smpl-vis
+[15.6621,  8.1512,  7.9639,  5.9568,  3.5758,  3.5963,  5.3418,  0.6771,
+0.6887, 12.9372,  0.1587,  0.1637,  0.6445,  1.0750,  1.0531,  4.0104,
+1.8793,  1.9705,  1.0224,  1.0528,  0.0879,  0.0879,  0.4723,  0.4729]
+
+'''

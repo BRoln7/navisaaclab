@@ -146,7 +146,7 @@ class TerminationsCfg:
     reach_goal = DoneTerm(func=reset_base.reach_goal, params={"goal_radius": 0.25})
 
     ############# for peds ###############
-    ped_fall = DoneTerm(func=reset_base.ped_fall)
+    ped_fall = DoneTerm(func=reset_base.ped_reset)
 
 @configclass
 class CurriculumCfg:
