@@ -15,65 +15,52 @@ import yaml
 num_r_store = 2
 num_p_store = 3
 joint_r_store = torch.tensor([[30, 25, 60, 25], [40, 25, 60, 30], 
-                              [50, 25, 58, 45], [100, 90, 70, 88]], device='cuda:0', dtype=torch.int32)
+                              [50, 25, 58, 45], [100, 90, 70, 88]], device='cuda:0', dtype=torch.int)
 joint_p_store = torch.tensor([[33, 90, 60, 90], [60, 90, 33, 90], 
-                              [55, 20, 55, 45]], device='cuda:0', dtype=torch.int32)
+                              [55, 20, 55, 45]], device='cuda:0', dtype=torch.int)
 num_r_garden = 3
 num_p_garden = 6
 joint_r_garden = torch.tensor([[30, 62, 48, 60], [70, 140, 85, 125], 
-                               [10, 40, 10, 60]], device='cuda:0', dtype=torch.int32)
+                               [10, 40, 10, 60]], device='cuda:0', dtype=torch.int)
 joint_p_garden = torch.tensor([[20, 20, 50, 20], [20, 30, 50, 20], [20, 40, 50, 40], 
                                [80, 20, 50, 20], [80, 30, 50, 20], [80, 40, 50, 40], 
                                [10, 110, 40, 120], [10, 130, 40, 140], 
-                               [34, 82, 70, 82]], device='cuda:0', dtype=torch.int32)
+                               [34, 82, 70, 82]], device='cuda:0', dtype=torch.int)
 
-traj_length_r = 100
-traj_length_p = 200
+traj_length_r = 400
+traj_length_p = 2000
 
 def config_init():
     motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
     with open(motion_file, 'r') as file:
         config = yaml.safe_load(file)
-    if config['env']['task'] != 'Isaac-Pacer': # type: ignore
-        global num_envs, motion_load, num_robots, goal_r_marker, traj_r_marker,\
-               goal_p_marker, traj_p_marker, ped_init, num_r_station, \
-               num_p_station, trajs_r, trajs_p
-
+        global num_envs, num_robots,  num_r_station, num_p_station
         num_envs = config['env']['num_envs'] # type: ignore
         num_robots = config['env']['num_robots'] # type: ignore
-        motion_load = MotionLoad(num_envs)
-        ped_init = False
         num_r_station = num_robots - num_r_store - num_r_garden
         num_p_station = num_envs - num_p_store - num_p_garden
+
+    if config['env']['task'] != 'Isaac-Pacer': # type: ignore
+        global motion_load, goal_r_marker, traj_r_marker, ped_init, trajs_r, trajs_p
+
+        motion_load = MotionLoad(num_envs)
+        ped_init = False
 
         goal_r_cfg = VisualizationMarkersCfg(
             prim_path="/World/Visuals/GoalRobotMarkers",
             markers={
                 "goal": sim_utils.SphereCfg(
-                    radius=0.1,
+                    radius=0.05,
                     visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)))})
         goal_r_marker = VisualizationMarkers(goal_r_cfg)
-        goal_p_cfg = VisualizationMarkersCfg(
-            prim_path="/World/Visuals/GoalPedMarkers",
-            markers={
-                "goal": sim_utils.SphereCfg(
-                    radius=0.1,
-                    visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 1.0)))})
-        goal_p_marker = VisualizationMarkers(goal_p_cfg)
         traj_r_cfg = VisualizationMarkersCfg(
             prim_path="/World/Visuals/TrajRobotMarkers",
             markers={
                 "traj": sim_utils.SphereCfg(
-                    radius=0.05,
+                    radius=0.025,
                     visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)))})
         traj_r_marker = VisualizationMarkers(traj_r_cfg)
-        traj_p_cfg = VisualizationMarkersCfg(
-            prim_path="/World/Visuals/TrajPedMarkers",
-            markers={
-                "traj": sim_utils.SphereCfg(
-                    radius=0.05,
-                    visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 1.0)))})
-        traj_p_marker = VisualizationMarkers(traj_p_cfg)
+
         trajs_r = torch.zeros(num_robots, traj_length_r, 2, device='cuda:0')
         trajs_p = torch.zeros(num_envs, traj_length_p, 2, device='cuda:0')
         
@@ -150,7 +137,8 @@ def reset_init_state_amp_motion(
             path = planning.get_dijkstra_path(map1_info.dilated_img, 
                                               map1_info.binary_img, 
                                               tuple(spawn_p_m[id].cpu().numpy()), 
-                                              tuple(goals_p_m[id].cpu().numpy()))
+                                              tuple(goals_p_m[id].cpu().numpy()),
+                                              traj_optim=True)
             path = planning.path_align_length(path, traj_length_p)
             path = map_nanager.transform_map_to_world(path, map1_info)
             trajs_p[id] = path
@@ -158,7 +146,8 @@ def reset_init_state_amp_motion(
             path = planning.get_dijkstra_path(map2_info.dilated_img, 
                                               map2_info.binary_img, 
                                               tuple(spawn_p_m[id].cpu().numpy()), 
-                                              tuple(goals_p_m[id].cpu().numpy()))
+                                              tuple(goals_p_m[id].cpu().numpy()),
+                                              traj_optim=True)
             path = planning.path_align_length(path, traj_length_p)
             path = map_nanager.transform_map_to_world(path, map2_info)
             trajs_p[id] = path
@@ -166,7 +155,8 @@ def reset_init_state_amp_motion(
             path = planning.get_dijkstra_path(map3_info.dilated_img, 
                                               map3_info.binary_img, 
                                               tuple(spawn_p_m[id].cpu().numpy()), 
-                                              tuple(goals_p_m[id].cpu().numpy()))
+                                              tuple(goals_p_m[id].cpu().numpy()),
+                                              traj_optim=True)
             path = planning.path_align_length(path, traj_length_p)
             path = map_nanager.transform_map_to_world(path, map3_info)
             trajs_p[id] = path
@@ -189,7 +179,8 @@ def reset_init_state_amp_motion(
         path = planning.get_dijkstra_path(map1_info.dilated_img, 
                                           map1_info.binary_img, 
                                           tuple(spawn_r_m[id].cpu().numpy()), 
-                                          tuple(goals_r_m[id].cpu().numpy()))
+                                          tuple(goals_r_m[id].cpu().numpy()),
+                                          traj_optim=True)
         path = planning.path_align_length(path, traj_length_r)
         path = map_nanager.transform_map_to_world(path, map1_info)
         trajs_r[id] = path
@@ -197,7 +188,8 @@ def reset_init_state_amp_motion(
         path = planning.get_dijkstra_path(map2_info.dilated_img, 
                                           map2_info.binary_img, 
                                           tuple(spawn_r_m[id].cpu().numpy()), 
-                                          tuple(goals_r_m[id].cpu().numpy()))
+                                          tuple(goals_r_m[id].cpu().numpy()),
+                                          traj_optim=True)
         path = planning.path_align_length(path, traj_length_r)
         path = map_nanager.transform_map_to_world(path, map2_info)
         trajs_r[id] = path
@@ -205,7 +197,8 @@ def reset_init_state_amp_motion(
         path = planning.get_dijkstra_path(map3_info.dilated_img, 
                                           map3_info.binary_img, 
                                           tuple(spawn_r_m[id].cpu().numpy()), 
-                                          tuple(goals_r_m[id].cpu().numpy()))
+                                          tuple(goals_r_m[id].cpu().numpy()),
+                                          traj_optim=True)
         path = planning.path_align_length(path, traj_length_r)
         path = map_nanager.transform_map_to_world(path, map3_info)
         trajs_r[id] = path
@@ -217,8 +210,3 @@ def reset_init_state_amp_motion(
     traj_r_marker.visualize(translations=torch.cat([trajs_r.reshape(-1, 2),
                                                   torch.zeros((B, 1),device='cuda:0')], dim=-1))
     
-    C, _ = trajs_p.reshape(-1, 2).shape
-    goal_p_marker.visualize(translations=torch.cat([goals_p_w, torch.zeros((num_envs,1),device='cuda:0')],
-                                                   dim=-1).reshape(-1,3))
-    traj_p_marker.visualize(translations=torch.cat([trajs_p.reshape(-1, 2),
-                                                  torch.zeros((C, 1),device='cuda:0')], dim=-1))    

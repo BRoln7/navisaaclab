@@ -48,10 +48,10 @@ class CrowdnavSceneCfg(InteractiveSceneCfg):
     robot: ArticulationCfg = CARTER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot") # type: ignore
 
     # lights
-    # light = AssetBaseCfg(
-    #     prim_path="/World/light",
-    #     spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=2000.0),
-    # )
+    light = AssetBaseCfg(
+        prim_path="/World/light",
+        spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=2000.0),
+    )
 
     # scene
     scene = AssetBaseCfg(

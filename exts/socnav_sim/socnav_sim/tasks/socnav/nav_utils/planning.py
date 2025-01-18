@@ -132,7 +132,7 @@ def get_dijkstra_path(grid, img, start, goal, viz=False, traj_optim=False):
         if traj_optim:
             control_points = select_control_points(path)
             smoothed_path = smooth_with_b_spline(control_points, 10*path.shape[0])
-            print('*** Found b-spline path with: ', smoothed_path.shape)
+            # print('*** Found b-spline path with: ', smoothed_path.shape)
         else:
             smoothed_path = path
 

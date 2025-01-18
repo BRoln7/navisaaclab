@@ -110,8 +110,8 @@ def publish_random_goal(_start_points:torch.tensor, _map_info:MapInfo, _min_leng
     return sampled_goals_m, sampled_goals_w
 
 def transform_map_to_world(_pos_map:torch.tensor, _map_info:MapInfo):
-    pos_map = _pos_map.to(torch.float32)
-    pos_world = torch.zeros_like(_pos_map, device='cuda:0', dtype=torch.float32)
+    pos_map = _pos_map.to(torch.float)
+    pos_world = torch.zeros_like(_pos_map, device='cuda:0', dtype=torch.float)
     pos_world[:, 0] = pos_map[:, 0] * _map_info.res + _map_info.origin[0]
     pos_world[:, 1] = pos_map[:, 1] * _map_info.res + _map_info.origin[1]
     
@@ -119,8 +119,11 @@ def transform_map_to_world(_pos_map:torch.tensor, _map_info:MapInfo):
 
 def transform_world_to_map(_pos_world:torch.tensor, _map_info:MapInfo):
     pos_map = torch.zeros_like(_pos_world, device='cuda:0', dtype=torch.int)
+    
     pos_map[:, 0] = (_pos_world[:, 0] - _map_info.origin[0]) / _map_info.res
     pos_map[:, 1] = (_pos_world[:, 1] - _map_info.origin[1]) / _map_info.res
+
+    pos_map = pos_map.to(torch.int)
     
     return pos_map
 
@@ -129,7 +132,7 @@ def get_spawn_and_goal(num_robots:int, num_store:int, num_garden:int, num_statio
     # get spawn for robot, get goals for robot in small scene
 
     goals_w = torch.ones((num_robots, 2),device='cuda:0')
-    goals_m = torch.ones((num_robots, 2),device='cuda:0', dtype=torch.int32)
+    goals_m = torch.ones((num_robots, 2),device='cuda:0', dtype=torch.int)
 
     env_ids = torch.arange(num_robots, device='cuda:0')
     store_id_0 = env_ids[env_ids < num_store]
@@ -149,7 +152,7 @@ def get_spawn_and_goal(num_robots:int, num_store:int, num_garden:int, num_statio
 
     spawn_station_m, spawn_station_w = random_spawn(map3_info, num_station)
 
-    spawn_m = torch.cat([spawn_store_m, spawn_garden_m, spawn_station_m], dim=0)
+    spawn_m = torch.cat([spawn_store_m, spawn_garden_m, spawn_station_m], dim=0).to(torch.int)
     spawn_w = torch.cat([spawn_store_w, spawn_garden_w, spawn_station_w], dim=0)
 
     return spawn_m, spawn_w, goals_w, goals_m

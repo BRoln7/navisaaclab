@@ -8,8 +8,8 @@ import os
 SMPL_HUMANOID_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         # usd_path=f"data/usd/robots/smpl_humanoid_vis.usda",
-        # usd_path=f"data/usd/robots/smpl_humanoid.usda",
-        usd_path=f"data/usd/robots/smpl_humanoid_vis_mass.usd",
+        usd_path=f"data/usd/robots/smpl_humanoid.usda",
+        # usd_path=f"data/usd/robots/smpl_humanoid_vis_mass.usd",
         copy_from_source=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=None,

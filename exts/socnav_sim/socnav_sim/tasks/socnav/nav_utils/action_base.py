@@ -23,6 +23,7 @@ from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
 from socnav_sim.tasks.amp.amp_utils.utils.running_mean_std import RunningMeanStd
 import socnav_sim.tasks.amp.amp_utils.utils.traj_generator as traj_generator
 import socnav_sim.tasks.socnav.nav_utils.reset_base as reset
+import socnav_sim.tasks.socnav.nav_utils.event_base as event
 import os
 import yaml
 
@@ -31,19 +32,26 @@ def config_init():
     with open(motion_file, 'r') as file:
         config = yaml.safe_load(file)
     if config['env']['task'] != 'Isaac-Pacer': # type: ignore
-        global trajectory_marker, actions_path, num_envs, num_robots, traj_speed
+        global actions_path, num_envs, num_robots, traj_speed, trajectory_marker, trajectoryog_marker
         trajectory_cfg = VisualizationMarkersCfg(
             prim_path="/World/Visuals/TrajectoryMarkers",
             markers={"waypoints": sim_utils.SphereCfg(
                 radius=0.05,
-                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.5)))})
+                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 1.0)))})
         trajectory_marker = VisualizationMarkers(trajectory_cfg)
+        # trajectoryog_cfg = VisualizationMarkersCfg(
+        #     prim_path="/World/Visuals/TrajectoryogMarkers",
+        #     markers={"waypoints": sim_utils.SphereCfg(
+        #         radius=0.05,
+        #         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 1.0)))})
+        # trajectoryog_marker = VisualizationMarkers(trajectoryog_cfg)
         actions_path = os.path.join(os.getcwd(), 'data', 'checkpoints', 'actions_policy.pth')
         num_envs = config['env']['num_envs'] # type: ignore
         num_robots = config['env']['num_robots'] # type: ignore
         traj_speed = config['env']['traj_speed'] # type: ignore
 config_init()
 
+traj_sample_index = torch.tensor([], device='cuda:0')
 
 class AnimationNet(nn.Module):
     def __init__(self):
@@ -97,6 +105,8 @@ class NavWithPedAction(JointAction):
         self.ped_scale = 3.1416
         self.ped_offset = 0.0
 
+        self.traj_speed = None
+
     def process_actions(self, actions):
         ############### peds ################
         humanoid_obs = self.compute_humanoid_obs(self._env)
@@ -125,7 +135,7 @@ class NavWithPedAction(JointAction):
                                                            carter.wheel_radius,
                                                            carter.width,
                                                            self.num_envs)
-
+        
     def apply_actions(self):
          ############### peds ################
          ped_asset: Articulation = self._env.scene['ped']
@@ -181,7 +191,6 @@ class NavWithPedAction(JointAction):
         env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long)
         root_pos = asset.data.root_pos_w[:, 0:3]
         self._traj_gen.reset(env_ids, root_pos)
-        self.progress_buf = torch.zeros(env.num_envs, device=env.device, dtype=torch.long)
 
         print(f"INFO: traj_gen init")
 
@@ -205,6 +214,17 @@ class NavWithPedAction(JointAction):
 
         return traj_samples
 
+    def traj_extension(self, env: ManagerBasedEnv):
+        start_index = (self.progress_buf * self.traj_speed).unsqueeze(-1).repeat(1, 10).to(torch.int) # type: ignore
+        samples = torch.arange(10, device='cuda:0').unsqueeze(0).repeat(env.num_envs, 1) * \
+            torch.ones(env.num_envs, 10, device='cuda:0', dtype=torch.int) * 15 # type: ignore
+        final_index = start_index + samples
+        assert final_index.max() < event.trajs_p.shape[1], "traj run out!"
+        traj_interval = event.trajs_p[torch.arange(env.num_envs, device='cuda:0')[:, None], final_index]
+        traj = torch.cat([traj_interval, torch.zeros(env.num_envs, 10, 1, device='cuda:0')], dim=-1)
+
+        return traj, final_index
+
     def compute_task_obs(self, 
                          env: ManagerBasedEnv, 
                          asset_cfg: SceneEntityCfg = SceneEntityCfg("ped")
@@ -213,28 +233,41 @@ class NavWithPedAction(JointAction):
 
         if self._traj_gen_init == False:
             self._traj_gen_init = True
-            self._build_traj_generator(env, asset_cfg)
+            # self._build_traj_generator(env, asset_cfg)
+            self.progress_buf = torch.zeros(env.num_envs, device=env.device, dtype=torch.long)
+            self.traj_speed = torch.randint(low=1, high=5, size=(env.num_envs,), device='cuda:0') * 0.40
 
         # for traj_reset
-        root_pos = asset.data.root_pos_w[:, 0:3]
-        if reset.ped_fall_reset is True:
-            root_pos_reset = root_pos[reset.reset_env_ids, :]
-            self._traj_gen.reset(reset.reset_env_ids, root_pos_reset) # type: ignore
-            self.progress_buf[reset.reset_env_ids] = 0 # type: ignore
-            reset.ped_fall_reset = False
+        # root_pos = asset.data.root_pos_w[:, 0:3]
+        # if reset.ped_fall_reset is True:
+        #     root_pos_reset = root_pos[reset.reset_env_ids, :]
+        #     self._traj_gen.reset(reset.reset_env_ids, root_pos_reset) # type: ignore
+        #     self.progress_buf[reset.reset_env_ids] = 0 # type: ignore
+        #     reset.ped_fall_reset = False
 
-        traj_ends_env_ids = (self.progress_buf == 600).nonzero(as_tuple=True)[0]
-        root_pos_traj_reset = root_pos[traj_ends_env_ids, ...]
-        self._traj_gen.reset(traj_ends_env_ids, root_pos_traj_reset) # type: ignore
-        self.progress_buf[traj_ends_env_ids] = 0 # type: ignore
+        # traj_ends_env_ids = (self.progress_buf == 600).nonzero(as_tuple=True)[0]
+        # root_pos_traj_reset = root_pos[traj_ends_env_ids, ...]
+        # self._traj_gen.reset(traj_ends_env_ids, root_pos_traj_reset) # type: ignore
+        # self.progress_buf[traj_ends_env_ids] = 0 # type: ignore
+
+        # for traj_reset        
+        if reset.ped_reset_flag is True:
+            if reset.fall_ids.numel()!=0:
+                self.progress_buf[reset.fall_ids] = 0 # type: ignore
+            if reset.reach_ids.numel()!=0:
+                self.progress_buf[reset.reach_ids] = 0 # type: ignore
+            reset.ped_reset_flag = False
 
         # compute traj_obs
-        traj_samples = self._fetch_traj_samples(env)
+        global traj_sample_index
+        traj_samples, traj_sample_index = self.traj_extension(env)
+        # traj_samples = self._fetch_traj_samples(env)
         self.progress_buf += 1 # type: ignore
         root_states = root_states_wxyz_to_xyzw(asset.data.root_state_w)
         obs = compute_location_observations(root_states, traj_samples, self._has_upright_start)
 
         trajectory_marker.visualize(translations=traj_samples.reshape(-1, 3))
+        # trajectoryog_marker.visualize(translations=traj_samples.reshape(-1, 3))
 
         return obs
     
