@@ -115,9 +115,9 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
     reach_goal_reward = RewTerm(mdp.compute_goal_reward,
-                          weight=1.0)
+                          weight=30.0)
     collision_reward = RewTerm(mdp.compute_collision_reward,
-                           weight=1.0)
+                           weight=30.0)
 
 @configclass
 class TerminationsCfg:

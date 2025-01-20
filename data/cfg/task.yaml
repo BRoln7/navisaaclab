@@ -4,18 +4,33 @@
 training:
   train: True
   checkpoint: null
-  # checkpoint: 'logs/sb3/Isaac-Pacer/pacer1.85/model_310272000_steps.zip'
+  # checkpoint: 'logs/sb3/Isaac-Pacer/pacer1.10/model_202752000_steps.zip'
   lr: !!float 2e-5
   disc_coef: 5
   bound_loss: 10
   data_file: 'motion_cap/amass_isaac_run_upright_slim.pkl'
   # data_file: 'motion_cap/amass_isaac_standing_upright_slim.pkl'
 env:
-  num_envs: 3072
+  num_envs: 4096
+  num_robots: 10 # there is a bug for config init, this is not useful for pacer-task
   task: Isaac-Pacer
-  log_name: pacer2.00
-  traj_speed: 2.00
-  amp_dt: !!float 0.016666666666666666 # 1 / 60
+  log_name: pacer4.00
+  traj_speed: 4.00
+  amp_dt: !!float 0.03333333333333 # 1 / 30
+
+# crowdnav
+# training:
+#   train: False
+#   # checkpoint: null
+#   checkpoint: 'logs/sb3/Isaac-Crowdnav/Cadrl-128-1024/model_2272000_steps.zip'
+#   data_file: 'motion_cap/amass_isaac_standing_upright_slim.pkl'
+# env:
+#   num_envs: 32
+#   num_robots: 16
+#   traj_speed: 1.80
+#   task: Isaac-Crowdnav
+#   method: Cadrl
+#   log_name: Cadrl-128-1024
 
 # drlvo
 # training:
@@ -28,15 +43,3 @@ env:
 #   traj_speed: 2.00
 #   task: Isaac-Drlvo
 #   log_name: drlvo
-
-# crowdnav
-# training:
-#   train: True
-#   checkpoint: null
-#   data_file: 'motion_cap/amass_isaac_standing_upright_slim.pkl'
-# env:
-#   num_envs: 12
-#   num_robots: 3
-#   traj_speed: 2.00
-#   task: Isaac-Crowdnav
-#   log_name: Cadrl

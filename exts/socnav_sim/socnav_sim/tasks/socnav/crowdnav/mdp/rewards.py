@@ -46,4 +46,3 @@ def compute_collision_reward(env: ManagerBasedEnv
     rewards[danger_ids] = -0.1 + 0.05 * obs.d_min[danger_ids]
 
     return rewards
-
