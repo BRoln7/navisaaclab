@@ -86,7 +86,11 @@ from scipy.interpolate import splprep, splev
 
 def smooth_with_b_spline(control_points, num):
 
-    tck, u = splprep(control_points.T, s=0)
+    k = 3
+    if control_points.shape[0] <= 3:
+        k = control_points.shape[0] - 1
+
+    tck, u = splprep(control_points.T, s=0, k=k)
     x = np.linspace(0, 1, num)
     new_points = splev(x, tck)
     return np.array(new_points).T
@@ -115,7 +119,7 @@ def get_dijkstra_path(grid, img, start, goal, viz=False, traj_optim=False):
     '''
         grid: ndarray binary map for planning
         img: ndarray origin figure for visualization
-        start: tuple 
+        start: tuple
         goal: tuple 
         viz: bool flag for visiualization
         traj_optim: bool flag for b_spline trajctory optimization  

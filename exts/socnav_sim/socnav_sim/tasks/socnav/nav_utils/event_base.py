@@ -194,8 +194,8 @@ def reset_init_state_amp_motion(
         path = map_nanager.transform_map_to_world(path, map2_info)
         trajs_r[id] = path
     for id in station_r_id:
-        path = planning.get_dijkstra_path(map3_info.dilated_img, 
-                                          map3_info.binary_img, 
+        path = planning.get_dijkstra_path(map3_info.dilated_img,
+                                          map3_info.binary_img,
                                           tuple(spawn_r_m[id].cpu().numpy()), 
                                           tuple(goals_r_m[id].cpu().numpy()),
                                           traj_optim=True)

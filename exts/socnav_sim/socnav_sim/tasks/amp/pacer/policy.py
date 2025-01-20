@@ -149,21 +149,21 @@ class AMPDemoBuffer():
 ################################################################
 global discriminator
 global amp_input_mean_std
-if config['training']['checkpoint'] is None: # type: ignore
+if config['env']['task'] == 'Isaac-Pacer': # type: ignore
     discriminator = Discriminator()
+    discriminator.to("cuda:0")
     bias_init(discriminator)
     amp_input_mean_std = RunningMeanStd(1950).to("cuda:0")
 
-elif config['training']['train'] == True: # type: ignore
-    discriminator = torch.load(config['training']['disc_checkpoint']) # type: ignore
-    amp_input_mean_std = torch.load(config['training']['std_checkpoint']) # type: ignore
+# elif config['training']['train'] == True: # type: ignore
+#     discriminator = torch.load(config['training']['disc_checkpoint']) # type: ignore
+#     amp_input_mean_std = torch.load(config['training']['std_checkpoint']) # type: ignore
 
-else: 
-    discriminator = Discriminator()
-    bias_init(discriminator)
-    amp_input_mean_std = RunningMeanStd(1950).to("cuda:0")
+# else: 
+#     discriminator = Discriminator()
+#     bias_init(discriminator)
+#     amp_input_mean_std = RunningMeanStd(1950).to("cuda:0")
 
-discriminator.to("cuda:0")
 ################################################################
 ########################## AMP PPO #############################
 ################################################################

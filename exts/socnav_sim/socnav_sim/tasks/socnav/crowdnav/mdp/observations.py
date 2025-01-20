@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from omni.isaac.lab.assets import Articulation
 from omni.isaac.lab.managers import SceneEntityCfg
+from omni.isaac.lab.markers import VisualizationMarkersCfg, VisualizationMarkers
 import omni.isaac.lab.sim as sim_utils
 import socnav_sim.tasks.socnav.nav_utils.event_base as event
 from socnav_sim.tasks.socnav.nav_utils.frame_rotation import * # type: ignore
@@ -15,23 +16,39 @@ from socnav_sim.tasks.socnav.nav_utils.frame_rotation import * # type: ignore
 if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedEnv, ManagerBasedRLEnv
 
+subgoal_dist = 20
+
 def config_init():
     motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
     with open(motion_file, 'r') as file:
         config = yaml.safe_load(file)
     if config['env']['task'] == 'Isaac-Crowdnav': # type: ignore
-        global num_envs, num_robots
+        global num_envs, num_robots, subgoal_marker, subgoal, last_subgoal_index, index_diff
         num_envs = config['env']['num_envs'] # type: ignore
         num_robots = config['env']['num_robots'] # type: ignore
+
+        subgoal_cfg = VisualizationMarkersCfg(
+            prim_path="/World/Visuals/SubgoalMarkers",
+            markers={"waypoints": sim_utils.SphereCfg(
+                radius=0.05,
+                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0)))})
+        subgoal_marker = VisualizationMarkers(subgoal_cfg)
+
+        subgoal = torch.zeros(num_envs, 2, device='cuda:0')
+        last_subgoal_index = torch.ones(num_robots, device='cuda:0') * subgoal_dist
+        index_diff = torch.zeros(num_robots, device='cuda:0')
+
 config_init()
+
+
 
 def compute_joint_states_obs(env: ManagerBasedEnv, 
                      asset_cfg1: SceneEntityCfg = SceneEntityCfg("robot"),
                      asset_cfg2: SceneEntityCfg = SceneEntityCfg("ped")
                     ) -> torch.Tensor:
     """
-    robot_state:            0.dg  1.vpref  2. alpha  3.radius  4.px  5.py  
-    vicinity agent state:   6.px^  7.py^  8.vx^  9.vy^  10.radius^ 11.da^ 12.radius~+radius(in robot local frame)
+    robot_state:            0.dg  1.vpref  2. alpha  3.radius  4.px  5.py  6.p_{subgoal_x}  7.p_{subgoal_y}
+    vicinity agent state:   8.px^  9.py^  10.vx^  11.vy^  12.radius^ 13.da^ 14.radius~+radius(in robot local frame)
     observations size:      [env_nums, ped_nums*joint_state]
     """
     robot: Articulation = env.scene[asset_cfg1.name]
@@ -48,7 +65,24 @@ def compute_joint_states_obs(env: ManagerBasedEnv,
     radius_r = torch.ones(num_robots, device='cuda:0').unsqueeze(-1)*0.5
     px, py = w_pos_r[:,0].unsqueeze(-1), w_pos_r[:,1].unsqueeze(-1)
 
-    robot_state = torch.cat([dg, v_pref, alpha, radius_r, px, py],dim=-1)
+    ####### find subgoal ########
+    _, B, _ = event.trajs_r.shape
+    dist_waypoints_2d = event.trajs_r - w_pos_r[..., :2].unsqueeze(1).repeat(1, B, 1)
+    dist_waypoints = torch.sqrt(dist_waypoints_2d[..., 0]**2 + dist_waypoints_2d[..., 1]**2)
+    
+    # find the nearest point as baseline
+    nearest_indices = torch.argmin(dist_waypoints, dim=1)
+
+    # subgoal is a fixed distance ahead of nearest points
+    subgoal_indices = nearest_indices + subgoal_dist
+    subgoal_obs = event.trajs_r[torch.arange(num_robots, device='cuda:0'), subgoal_indices]
+    
+    global subgoal, last_subgoal_index, index_diff
+    subgoal = subgoal_obs
+    index_diff = subgoal_indices - last_subgoal_index
+    last_subgoal_index = subgoal_indices
+
+    robot_state = torch.cat([dg, v_pref, alpha, radius_r, px, py, subgoal_obs],dim=-1)
 
     # ped state
     ped_pos_w = ped.data.root_pos_w.unsqueeze(0).repeat(num_robots, 1, 1)
@@ -68,7 +102,7 @@ def compute_joint_states_obs(env: ManagerBasedEnv,
     da = torch.sqrt(ped_pos_r[...,0]**2 + ped_pos_r[...,1]**2)
     da = da.unsqueeze(-1)
 
-    # reserve the nearest 4 pedestrains
+    # sort and reserve the nearest 4 pedestrains
     ped_state = torch.cat([ped_pos_r, ped_vel_r, radius_p, da, 
                            (radius_r.unsqueeze(1).repeat(1,num_envs,1)+radius_p)], dim=-1)
     key_values = ped_state[..., 5]
@@ -79,10 +113,13 @@ def compute_joint_states_obs(env: ManagerBasedEnv,
     joint_state = torch.cat([robot_state, nearest_ped_state], dim=-1)
 
     global d_min
-    d_min = joint_state[:, 11]
+    d_min = joint_state[:, 13]
 
     _, N = joint_state.shape
     joint_state = torch.cat([joint_state, torch.ones(num_envs-num_robots, N, device='cuda:0')], dim=0)
+
+    subgoal_vis = torch.cat([subgoal_obs, torch.zeros(num_robots, 1, device='cuda:0')], dim=-1)
+    subgoal_marker.visualize(translations=subgoal_vis.reshape(-1, 3))
 
     return joint_state
 

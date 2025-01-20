@@ -39,12 +39,6 @@ def config_init():
                 radius=0.05,
                 visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 1.0)))})
         trajectory_marker = VisualizationMarkers(trajectory_cfg)
-        # trajectoryog_cfg = VisualizationMarkersCfg(
-        #     prim_path="/World/Visuals/TrajectoryogMarkers",
-        #     markers={"waypoints": sim_utils.SphereCfg(
-        #         radius=0.05,
-        #         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 1.0)))})
-        # trajectoryog_marker = VisualizationMarkers(trajectoryog_cfg)
         actions_path = os.path.join(os.getcwd(), 'data', 'checkpoints', 'actions_policy.pth')
         num_envs = config['env']['num_envs'] # type: ignore
         num_robots = config['env']['num_robots'] # type: ignore

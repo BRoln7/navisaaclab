@@ -79,7 +79,8 @@ def publish_random_goal(_start_points:torch.tensor, _map_info:MapInfo, _min_leng
     max_radius = _max_lenght
 
     rows, cols = _map_info.dilated_img.shape
-    sampled_goals = []
+    sampled_goals_w = []
+    sampled_goals_m = []
     robot_poses = _start_points
 
     for robot_pos in robot_poses:
@@ -98,14 +99,14 @@ def publish_random_goal(_start_points:torch.tensor, _map_info:MapInfo, _min_leng
             
             if 0 <= sample_x < cols and 0 <= sample_y < rows:
                 if _map_info.dilated_img[sample_y, sample_x] == 0:
-                    sampled_goals.append(torch.tensor((sample_x*_map_info.res+_map_info.origin[0], 
-                                                       sample_y*_map_info.res+_map_info.origin[1]),
-                                                       device='cuda:0'))
+                    sampled_goals_w.append(torch.tensor((sample_x*_map_info.res+_map_info.origin[0], 
+                                                         sample_y*_map_info.res+_map_info.origin[1]),
+                                                         device='cuda:0'))
+                    sampled_goals_m.append(torch.tensor([sample_x, sample_y], device='cuda:0'))
                     break
         
-    sampled_goals_w = torch.stack(sampled_goals)
-
-    sampled_goals_m = transform_world_to_map(sampled_goals_w, _map_info)
+    sampled_goals_w = torch.stack(sampled_goals_w)
+    sampled_goals_m = torch.stack(sampled_goals_m).to(torch.int)
 
     return sampled_goals_m, sampled_goals_w
 

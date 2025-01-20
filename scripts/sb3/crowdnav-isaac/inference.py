@@ -12,6 +12,7 @@ with open(motion_file, 'r') as file:
 parser = argparse.ArgumentParser(description="Train an RL agent for amp task.")
 parser.add_argument("--num_envs", type=int, default=config['env']['num_envs'], help="Number of environments to simulate.") # type: ignore
 parser.add_argument("--task", type=str, default=config['env']['task'], help="Name of the task.") # type: ignore
+parser.add_argument("--method", type=str, default=config['env']['method'], help="Name of the method.") # type: ignore
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
 parser.add_argument("--checkpoint", type=str, default=config['training']['checkpoint'], help="Path to model checkpoint.") # type: ignore
@@ -35,7 +36,8 @@ import torch
 
 from omni.isaac.lab_tasks.utils.parse_cfg import load_cfg_from_registry, parse_env_cfg, get_checkpoint_path
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
-from socnav_sim.tasks.socnav.nav_utils.policy import MRPPO
+from socnav_sim.tasks.socnav.nav_utils.policy_base import MRPPO
+from socnav_sim.tasks.socnav.crowdnav.policy import CadrlEncoder, SarlEncoder
 import socnav_sim.tasks  # noqa: F401
 
 def main():

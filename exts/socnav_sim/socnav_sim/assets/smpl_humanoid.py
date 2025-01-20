@@ -7,8 +7,9 @@ import os
 
 SMPL_HUMANOID_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        # usd_path=f"data/usd/robots/smpl_humanoid_vis.usda",
-        usd_path=f"data/usd/robots/smpl_humanoid.usda",
+        # usd_path=f"data/usd/robots/smpl_humanoid_neutral.usd",
+        usd_path=f"data/usd/robots/new_human.usd",
+        # usd_path=f"data/usd/robots/smpl_humanoid.usda",
         # usd_path=f"data/usd/robots/smpl_humanoid_vis_mass.usd",
         copy_from_source=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
@@ -72,11 +73,11 @@ SMPL_HUMANOID_CFG = ArticulationCfg(
 body_mass
 
 ['Pelvis',
- 'L_Hip',
- 'R_Hip', 
- 'Torso', 
- 'L_Knee', 
- 'R_Knee', 
+'L_Hip',
+'R_Hip', 
+'Torso', 
+'L_Knee', 
+'R_Knee', 
 'Spine', 
 'L_Ankle', 
 'R_Ankle', 
@@ -87,7 +88,7 @@ body_mass
 'L_Thorax', 
 'R_Thorax', 
 'Head', 
-'L_Shoulder', 
+L_Shoulder', 
 'R_Shoulder', 
 'L_Elbow', 
 'R_Elbow', 

@@ -78,7 +78,6 @@ def ped_reset(
                                            velocity=dof_vel[:,dof_gym_to_sim][ped_fall_ids], 
                                            env_ids=ped_fall_ids) # type: ignore
 
-
     # for reach goal
     goal_dist_2d = ped_asset.data.root_state_w[:, :2] - events.goals_p_w
     goal_dist = torch.sqrt(goal_dist_2d[:,0]**2 + goal_dist_2d[:,1]**2)
@@ -114,6 +113,7 @@ def ped_reset(
             reach_goal_pos_m = map_nanager.transform_world_to_map(reach_goal_pos_w, events.map3_info)
 
             events.spawn_p_w[station_p_id], events.spawn_p_m[station_p_id] = reach_goal_pos_w, reach_goal_pos_m
+            events.spawn_p_w_3d[station_p_id] = ped_asset.data.root_pos_w[station_p_id, :3]
             events.goals_p_m[station_p_id], events.goals_p_w[station_p_id] = map_nanager.publish_random_goal(
                                                                                 events.spawn_p_w[station_p_id], 
                                                                                 events.map3_info, 6.0, 7.0)

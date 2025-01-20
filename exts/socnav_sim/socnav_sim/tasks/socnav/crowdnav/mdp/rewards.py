@@ -1,17 +1,19 @@
 import torch
-import yaml
-import os
 from omni.isaac.lab.envs import ManagerBasedEnv
 from omni.isaac.lab.assets import Articulation
 from omni.isaac.lab.managers import SceneEntityCfg
 import socnav_sim.tasks.socnav.crowdnav.mdp.observations as obs
 import socnav_sim.tasks.socnav.nav_utils.event_base as event
 
-def compute_goal_reward(env: ManagerBasedEnv, 
-                            asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+dist_coeff = 1.0
+subgoal_coeff = 0.05
+
+def compute_goal_reward(env: ManagerBasedEnv,
+                        asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
                     ) -> torch.Tensor:
     asset: Articulation = env.scene[asset_cfg.name]
-
+    
+    ##### final goal reward #####
     num_robot, _ = event.goals_r_w.shape
     root_pos = asset.data.root_pos_w[:num_robot, :2]
     dist_2d = event.goals_r_w - root_pos
@@ -20,6 +22,15 @@ def compute_goal_reward(env: ManagerBasedEnv,
     rewards = torch.zeros(env.num_envs, device='cuda:0')
     rew_ids = torch.where(distance <= 0.2)
     rewards[rew_ids] = 1
+
+    B, _ = obs.subgoal.shape
+
+    #### getting closer to goal ####
+    dist_reward = torch.exp(- dist_coeff * distance)
+    rewards[:B] += dist_reward
+
+    #### subgoal reward ####
+    rewards[:B] += subgoal_coeff * obs.index_diff
 
     return rewards
 

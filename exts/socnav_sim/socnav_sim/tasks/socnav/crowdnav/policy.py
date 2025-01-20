@@ -17,7 +17,7 @@ config_init()
 
 # ga3c-cadrl
 class CadrlEncoder(BaseFeaturesExtractor):
-    def __init__(self, observation_space: gym.spaces.Box, features_dim:int = 38):
+    def __init__(self, observation_space: gym.spaces.Box, features_dim:int = 40):
         super(CadrlEncoder, self).__init__(observation_space, features_dim)
         self.input_dim = 7
         self.hidden_dim = 32
@@ -25,8 +25,8 @@ class CadrlEncoder(BaseFeaturesExtractor):
     
     def forward(self, input_obs):
         B, _ = input_obs.shape
-        self_obs = input_obs[..., :6]
-        agent_obs = input_obs[..., 6:].reshape(B, -1, 7)
+        self_obs = input_obs[..., :8]
+        agent_obs = input_obs[..., 8:].reshape(B, -1, 7)
 
         h0 = torch.zeros(1, B, self.hidden_dim, device='cuda:0')
         c0 = torch.zeros(1, B, self.hidden_dim, device='cuda:0')
