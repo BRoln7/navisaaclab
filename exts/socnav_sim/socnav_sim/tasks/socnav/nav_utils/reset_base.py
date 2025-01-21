@@ -4,15 +4,29 @@ import torch
 from omni.isaac.lab.managers import SceneEntityCfg
 from omni.isaac.lab.assets import Articulation, RigidObject
 from omni.isaac.lab.envs import ManagerBasedRLEnv
-from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import dof_gym_to_sim
+from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
+    dof_gym_to_sim,
+    root_pos_init,
+    root_rot_init,
+    root_vel_init,
+    root_ang_vel_init,
+    dof_pos_init,
+    dof_vel_init)
 import socnav_sim.tasks.socnav.nav_utils.event_base as events
 import socnav_sim.tasks.socnav.nav_utils.action_base as action
 import socnav_sim.tasks.socnav.nav_utils.map_manager as map_nanager
 import socnav_sim.tasks.socnav.nav_utils.planning as planning
 from omni.isaac.lab.markers import VisualizationMarkersCfg, VisualizationMarkers
 import omni.isaac.lab.sim as sim_utils
+import os
+import yaml
 
 ped_reset_flag, fall_ids, reach_ids = False, torch.tensor([], device='cuda:0'), torch.tensor([], device='cuda:0')
+
+motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
+with open(motion_file, 'r') as file:
+    config = yaml.safe_load(file)
+fixed_pose = config['env']['fixed_pose'] # type: ignore
 
 traj_p_cfg = VisualizationMarkersCfg(
     prim_path="/World/Visuals/TrajPedMarkers",
@@ -57,8 +71,20 @@ def ped_reset(
     ped_asset: RigidObject = env.scene[asset_cfg.name]
 
     wxyz_to_xyzw = [3, 0, 1, 2]
-    motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, \
-    root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = events.motion_load.sample_ref_state(env.num_envs)
+
+    if fixed_pose:
+        root_pos, root_rot, dof_pos, \
+            root_vel, root_ang_vel, dof_vel = root_pos_init, root_rot_init, dof_pos_init,\
+            root_vel_init, root_ang_vel_init, dof_vel_init
+        root_pos = root_pos.repeat(env.num_envs, 1)
+        root_rot = root_rot.repeat(env.num_envs, 1)
+        dof_pos = dof_pos.repeat(env.num_envs, 1)
+        root_vel = root_vel.repeat(env.num_envs, 1)
+        root_ang_vel = root_ang_vel.repeat(env.num_envs, 1)
+        dof_vel = dof_vel.repeat(env.num_envs, 1)
+    else:
+        motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, \
+        root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = events.motion_load.sample_ref_state(env.num_envs)
 
     # for fall-reset
     ped_fall_ids = torch.nonzero(ped_asset.data.root_state_w[:, 2] < 0.4).squeeze(-1)

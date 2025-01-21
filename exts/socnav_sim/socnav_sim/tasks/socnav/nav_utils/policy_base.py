@@ -125,3 +125,8 @@ class MRPPO(PPO):
 
         return True
 
+    def train(self):
+        super().train()
+        self.logger.record("train/rew_mean", self.rollout_buffer.rewards.mean().item())
+
+

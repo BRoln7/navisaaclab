@@ -2,7 +2,14 @@ from omni.isaac.lab.envs import ManagerBasedEnv
 import torch
 from omni.isaac.lab.managers import SceneEntityCfg
 from omni.isaac.lab.assets import Articulation, RigidObject
-from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import dof_gym_to_sim
+from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
+    dof_gym_to_sim,
+    root_pos_init,
+    root_rot_init,
+    root_vel_init,
+    root_ang_vel_init,
+    dof_pos_init,
+    dof_vel_init)
 from socnav_sim.tasks.amp.amp_utils.utils.load_motion import MotionLoad
 from omni.isaac.lab.markers import VisualizationMarkersCfg, VisualizationMarkers
 import omni.isaac.lab.sim as sim_utils
@@ -10,6 +17,7 @@ import socnav_sim.tasks.socnav.nav_utils.map_manager as map_nanager
 import socnav_sim.tasks.socnav.nav_utils.planning as planning
 import os
 import yaml
+import socnav_sim.tasks.socnav.crowdnav.mdp.observations as obs
 
 # fixed positions for small scenes
 num_r_store = 2
@@ -34,8 +42,9 @@ def config_init():
     motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
     with open(motion_file, 'r') as file:
         config = yaml.safe_load(file)
-        global num_envs, num_robots,  num_r_station, num_p_station
+        global num_envs, num_robots,  num_r_station, num_p_station, fixed_pose
         num_envs = config['env']['num_envs'] # type: ignore
+        # num_envs = 16
         num_robots = config['env']['num_robots'] # type: ignore
         num_r_station = num_robots - num_r_store - num_r_garden
         num_p_station = num_envs - num_p_store - num_p_garden
@@ -43,7 +52,9 @@ def config_init():
     if config['env']['task'] != 'Isaac-Pacer': # type: ignore
         global motion_load, goal_r_marker, traj_r_marker, ped_init, trajs_r, trajs_p
 
-        motion_load = MotionLoad(num_envs)
+        fixed_pose = config['env']['fixed_pose'] # type: ignore
+        if not fixed_pose:
+            motion_load = MotionLoad(num_envs)
         ped_init = False
 
         goal_r_cfg = VisualizationMarkersCfg(
@@ -114,8 +125,19 @@ def reset_init_state_amp_motion(
         ped_init = True
         ped_init_ids = torch.arange(env.num_envs, device='cuda:0')
         wxyz_to_xyzw = [3, 0, 1, 2]
-        motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, \
-        root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = motion_load.sample_ref_state(env.num_envs)
+        if fixed_pose:
+            root_pos, root_rot, dof_pos, \
+                root_vel, root_ang_vel, dof_vel = root_pos_init, root_rot_init, dof_pos_init,\
+                root_vel_init, root_ang_vel_init, dof_vel_init
+            root_pos = root_pos.repeat(env.num_envs, 1)
+            root_rot = root_rot.repeat(env.num_envs, 1)
+            dof_pos = dof_pos.repeat(env.num_envs, 1)
+            root_vel = root_vel.repeat(env.num_envs, 1)
+            root_ang_vel = root_ang_vel.repeat(env.num_envs, 1)
+            dof_vel = dof_vel.repeat(env.num_envs, 1)
+        else:
+            motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, \
+            root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = motion_load.sample_ref_state(env.num_envs)
 
         ped_asset.write_root_pose_to_sim(torch.cat([spawn_p_w_3d[ped_init_ids], 
                                                     root_rot[:, wxyz_to_xyzw][ped_init_ids]], dim=-1), 
@@ -172,8 +194,9 @@ def reset_init_state_amp_motion(
     robot_asset.write_root_pose_to_sim(root_pose_default[env_ids], env_ids=env_ids) # type: ignore
     
     ############################## path planning for robots ###############################
-    goals_r_m[station_r_id], goals_r_w[station_r_id] = map_nanager.publish_random_goal(spawn_r_w[station_r_id], 
-                                                                                       map3_info, 4.0, 5.0)
+    if spawn_r_w[station_r_id].numel() != 0:
+        goals_r_m[station_r_id], goals_r_w[station_r_id] = map_nanager.publish_random_goal(spawn_r_w[station_r_id], 
+                                                                                           map3_info, 4.0, 5.0)
     # path planning and lenght alignment
     for id in store_r_id:
         path = planning.get_dijkstra_path(map1_info.dilated_img, 
@@ -210,3 +233,5 @@ def reset_init_state_amp_motion(
     traj_r_marker.visualize(translations=torch.cat([trajs_r.reshape(-1, 2),
                                                   torch.zeros((B, 1),device='cuda:0')], dim=-1))
     
+    robot_id = env_ids[env_ids < num_robots]
+    obs.last_dg[robot_id] = 0.0

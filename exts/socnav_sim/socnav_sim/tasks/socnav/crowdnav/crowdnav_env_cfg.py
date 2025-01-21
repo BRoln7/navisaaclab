@@ -127,7 +127,7 @@ class TerminationsCfg:
     # (1) Terminate if the time out
     time_out = DoneTerm(func=reset_base.time_runout, time_out=True)
     # (2) Terminate if the robot reach goal
-    reach_goal = DoneTerm(func=reset_base.reach_goal, params={"goal_radius": 0.3})
+    reach_goal = DoneTerm(func=reset_base.reach_goal, params={"goal_radius": 0.4})
 
     ############# for peds ###############
     ped_fall = DoneTerm(func=reset_base.ped_reset)
@@ -159,7 +159,7 @@ class CrowdnavEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 4
-        self.episode_length_s = 32
+        self.episode_length_s = 24
         # simulation settings
         self.sim.dt = 1 / 120.0
         self.sim.render_interval = self.decimation
