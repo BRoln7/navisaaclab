@@ -76,9 +76,13 @@ def compute_joint_states_obs(env: ManagerBasedEnv,
     # subgoal is a fixed distance ahead of nearest points
     subgoal_indices = nearest_indices + subgoal_dist
     subgoal_obs = event.trajs_r[torch.arange(num_robots, device='cuda:0'), subgoal_indices]
+    # transform subgoal to robot frame
+    w_Rot_r = quat_to_rot_matrix(robot.data.root_quat_w[:num_robots], num_robots)[:, :2, :2]
+    subgoal_r = subgoal_obs - robot.data.root_pos_w[:num_robots, :2]
+    subgoal_r = torch.matmul(w_Rot_r.inverse(), subgoal_r.unsqueeze(-1)).squeeze(-1)
     
     global subgoal, dist_diff, last_dg
-    subgoal = subgoal_obs
+    subgoal = subgoal_r
 
     reset_id = torch.where(last_dg == 0.0)[0]
     last_dg[reset_id] = dg[reset_id]
@@ -86,7 +90,7 @@ def compute_joint_states_obs(env: ManagerBasedEnv,
     dist_diff = (last_dg - dg).squeeze(-1)
     last_dg = dg
 
-    robot_state = torch.cat([v_pref, alpha, radius_r, px, py, subgoal_obs],dim=-1)
+    robot_state = torch.cat([v_pref, alpha, radius_r, px, py, subgoal_r],dim=-1)
 
     # ped state
     ped_pos_w = ped.data.root_pos_w.unsqueeze(0).repeat(num_robots, 1, 1)
@@ -117,7 +121,7 @@ def compute_joint_states_obs(env: ManagerBasedEnv,
     joint_state = torch.cat([robot_state, nearest_ped_state], dim=-1)
 
     global d_min
-    d_min = joint_state[:, 12]
+    d_min = nearest_ped_state[:, 5]
 
     _, N = joint_state.shape
     joint_state = torch.cat([joint_state, torch.ones(num_envs-num_robots, N, device='cuda:0')], dim=0)

@@ -8,14 +8,19 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.utils import obs_as_tensor
+from typing import Iterable, Optional, Union
+import io
+import pathlib
 
 from gymnasium import spaces
+import time
 
 motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
 with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 if config['env']['task'] != 'Isaac-Pacer': # type: ignore
     num_robots = config['env']['num_robots'] # type: ignore
+    log_name = config['env']['log_name'] # type: ignore
 
 
 class MRPPO(PPO):
@@ -27,6 +32,10 @@ class MRPPO(PPO):
 
     def __init__(self, *args, **kwargs):
         super(MRPPO, self).__init__(*args, **kwargs)
+        self.reward_time_record = torch.zeros(num_robots, 10, 2, device='cuda:0') # include reward and training time
+        self.curr_episode_rew = torch.zeros(num_robots, device='cuda:0')
+        self.init_time = time.time()
+        self.policy_update_num = 0
 
     def _setup_model(self) -> None:
 
@@ -78,6 +87,21 @@ class MRPPO(PPO):
                     clipped_actions = np.clip(actions, self.action_space.low, self.action_space.high)
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
+            
+            # episode reward record
+            rewards_tensor = torch.tensor(rewards, device='cuda:0')
+            self.curr_episode_rew += rewards_tensor[:num_robots]
+
+            dones_tensor = torch.tensor(dones, device='cuda:0')[:num_robots]
+            dones_ids = torch.nonzero(dones_tensor).squeeze(-1)
+
+            if dones_ids.numel() != 0:
+                training_time = torch.tensor(time.time() - self.init_time, device='cuda:0').repeat(dones_ids.numel())
+                rew_time = torch.cat([self.curr_episode_rew[dones_ids].unsqueeze(-1), 
+                                      training_time.unsqueeze(-1)], dim=-1)
+                self.reward_time_record[dones_ids] = torch.cat([self.reward_time_record[dones_ids][:, 1:], 
+                                                                rew_time.unsqueeze(1)], dim=1)
+                self.curr_episode_rew[dones_ids] = 0
 
             self.num_timesteps += env.num_envs
 
@@ -125,8 +149,24 @@ class MRPPO(PPO):
 
         return True
 
+    def save(
+        self,
+        path: Union[str, pathlib.Path, io.BufferedIOBase],
+        exclude: Optional[Iterable[str]] = None,
+        include: Optional[Iterable[str]] = None,
+    ) -> None:
+        super().save(path, exclude, include)
+
+
     def train(self):
         super().train()
+        
         self.logger.record("train/rew_mean", self.rollout_buffer.rewards.mean().item())
+        self.policy_update_num += 1
+        print('[INFO]: policy updte num: ', self.policy_update_num)
+        if self.policy_update_num == 500:
+            torch.save(self.reward_time_record, log_name+'-500.pt')
+        if self.policy_update_num >= 997:
+            torch.save(self.reward_time_record, log_name+'-1000.pt')
 
 

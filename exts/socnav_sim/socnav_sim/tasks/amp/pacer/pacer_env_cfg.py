@@ -122,13 +122,13 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
     task_reward = RewTerm(mdp.compute_location_reward,
-                          weight=15.0)
+                          weight=0.5)
     power_reward = RewTerm(mdp.compute_power_reward,
-                           weight=15.0)
-    # direction_reward = RewTerm(mdp.compute_direction_reward,
-    #                        weight=0.5)
+                           weight=0.5)
+    direction_reward = RewTerm(mdp.compute_direction_reward,
+                           weight=0.5)
     amp_reward = RewTerm(obs_computer.compute_amp_reward,
-                         weight=30.0)
+                         weight=1.0)
 
 @configclass
 class TerminationsCfg:
@@ -137,9 +137,9 @@ class TerminationsCfg:
     # (1) Terminate if the trajectory ends
     trajectory_end = DoneTerm(func=mdp.time_out, time_out=True)
     # (2) Terminate if the robot falls
-    Pelvis_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.15})
+    Pelvis_height = DoneTerm(func=mdp.root_state_below_minimum, params={"minimum_height": 0.60})
     # (3) Terminate if the robot can't follow trajectory
-    traj_fail = DoneTerm(func=mdp.far_from_traj, params={"maximum_distance": 4.0})
+    # traj_fail = DoneTerm(func=mdp.far_from_traj, params={"maximum_distance": 4.0})
 
 
 @configclass
