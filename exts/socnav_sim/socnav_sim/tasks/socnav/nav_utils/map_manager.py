@@ -68,7 +68,7 @@ def random_spawn(_map_info:MapInfo, _num_agent:int):
 
     spawn_pos_w = transform_map_to_world(spawn_pos_m.float(), _map_info)
 
-    return spawn_pos_m, spawn_pos_w
+    return spawn_pos_m.to(torch.int), spawn_pos_w.to(torch.float)
 
 def publish_random_goal(_start_points:torch.tensor, _map_info:MapInfo, _min_length, _max_lenght):
     '''

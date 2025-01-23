@@ -50,16 +50,17 @@ class CrowdnavSceneCfg(InteractiveSceneCfg):
     # lights
     light = AssetBaseCfg(
         prim_path="/World/light",
-        spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=2000.0),
+        spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
+        # spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
 
     # scene
-    # scene = AssetBaseCfg(
-    #     prim_path="/World/scene",
-    #     init_state=AssetBaseCfg.InitialStateCfg(
-    #         pos=(0, 0, -0.05)),
-    #     spawn=sim_utils.UsdFileCfg(usd_path=f"data/usd/scenes/scene_crowdnav/scene_crowdnav.usd"),
-    # )
+    scene = AssetBaseCfg(
+        prim_path="/World/scene",
+        init_state=AssetBaseCfg.InitialStateCfg(
+            pos=(0, 0, -0.05)),
+        spawn=sim_utils.UsdFileCfg(usd_path=f"data/usd/scenes/scene_crowdnav/scene_crowdnav.usd"),
+    )
 
 ##
 # MDP settings

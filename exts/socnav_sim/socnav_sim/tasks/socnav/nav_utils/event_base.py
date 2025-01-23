@@ -22,12 +22,16 @@ import socnav_sim.tasks.socnav.crowdnav.mdp.observations as obs
 # fixed positions for small scenes
 num_r_store = 2
 num_p_store = 3
+# num_r_store = 0
+# num_p_store = 0
 joint_r_store = torch.tensor([[30, 25, 60, 25], [40, 25, 60, 30], 
                               [50, 25, 58, 45], [100, 90, 70, 88]], device='cuda:0', dtype=torch.int)
 joint_p_store = torch.tensor([[33, 90, 60, 90], [60, 90, 33, 90], 
                               [55, 20, 55, 45]], device='cuda:0', dtype=torch.int)
 num_r_garden = 3
 num_p_garden = 6
+# num_r_garden = 0
+# num_p_garden = 0
 joint_r_garden = torch.tensor([[30, 62, 48, 60], [70, 140, 85, 125], 
                                [10, 40, 10, 60]], device='cuda:0', dtype=torch.int)
 joint_p_garden = torch.tensor([[20, 20, 50, 20], [20, 30, 50, 20], [20, 40, 50, 40], 
@@ -36,7 +40,7 @@ joint_p_garden = torch.tensor([[20, 20, 50, 20], [20, 30, 50, 20], [20, 40, 50, 
                                [34, 82, 70, 82]], device='cuda:0', dtype=torch.int)
 
 traj_length_r = 400
-traj_length_p = 2000
+traj_length_p = 700
 
 def config_init():
     motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
@@ -46,8 +50,8 @@ def config_init():
         num_envs = config['env']['num_envs'] # type: ignore
         # num_envs = 16
         num_robots = config['env']['num_robots'] # type: ignore
-        num_r_station = num_robots - num_r_store - num_r_garden
-        num_p_station = num_envs - num_p_store - num_p_garden
+        num_r_station = max(num_robots - num_r_store - num_r_garden, 1)
+        num_p_station = max(num_envs - num_p_store - num_p_garden, 2)
 
     if config['env']['task'] != 'Isaac-Pacer': # type: ignore
         global motion_load, goal_r_marker, traj_r_marker, ped_init, trajs_r, trajs_p
@@ -97,6 +101,12 @@ spawn_r_m, spawn_r_w, goals_r_w, goals_r_m = map_nanager.get_spawn_and_goal(num_
 spawn_p_m, spawn_p_w, goals_p_w, goals_p_m = map_nanager.get_spawn_and_goal(num_envs, num_p_store, num_p_garden, 
                                                                             num_p_station, joint_p_store, joint_p_garden, 
                                                                             map1_info, map2_info, map3_info)
+
+# spawn_p_m, spawn_p_w = map_nanager.random_spawn(map3_info, 2)
+# goals_p_w, goals_p_m = torch.zeros_like(spawn_p_m, device='cuda:0', dtype=torch.float), torch.zeros_like(spawn_p_w, device='cuda:0', dtype=torch.int)
+# spawn_r_m, spawn_r_w = map_nanager.random_spawn(map3_info, 1)
+# goals_r_w, goals_r_m = torch.zeros_like(spawn_r_m, device='cuda:0', dtype=torch.float), torch.zeros_like(spawn_r_w, device='cuda:0', dtype=torch.int)
+
 spawn_p_w_3d = torch.cat([spawn_p_w, torch.ones(num_envs, 1, device='cuda:0')*0.9556],dim=-1)
 
 # import matplotlib.pyplot as plt
