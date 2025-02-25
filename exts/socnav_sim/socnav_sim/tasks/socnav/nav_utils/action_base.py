@@ -146,6 +146,8 @@ class NavWithPedAction(JointAction):
                             'R_Toe_x', 'R_Toe_y', 'R_Toe_z']
         freeze_joint_idx = ped_asset.find_joints(freeze_joint_name)
         self.ped_actions[:, freeze_joint_idx[0]] = 0 # type: ignore
+        self.ped_actions[:, [57, 58, 59, 60, 61, 62]] = torch.clamp( # type: ignore
+            self.ped_actions[:, [57, 58, 59, 60, 61, 62]], min=-0.10, max=0.10) # type: ignore
 
         ############## compute ped's observations #####################
     def compute_humanoid_obs(self, 
@@ -229,7 +231,7 @@ class NavWithPedAction(JointAction):
             self._traj_gen_init = True
             # self._build_traj_generator(env, asset_cfg)
             self.progress_buf = torch.zeros(env.num_envs, device=env.device, dtype=torch.long)
-            self.traj_speed = torch.randint(low=1, high=5, size=(env.num_envs,), device='cuda:0') * 0.40
+            self.traj_speed = torch.randint(low=4, high=5, size=(env.num_envs,), device='cuda:0') * 0.40
 
         # for traj_reset
         # root_pos = asset.data.root_pos_w[:, 0:3]

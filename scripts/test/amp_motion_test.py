@@ -31,6 +31,7 @@ from omni.isaac.lab.sim import SimulationContext
 from socnav_sim.tasks.amp.amp_utils.utils.load_motion import MotionLoad
 from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import dof_gym_to_sim
 from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import rot_wxyz_to_xyzw
+from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
 
 ##
 # Pre-defined configs
@@ -44,7 +45,11 @@ def design_scene() -> tuple[dict, list[list[float]]]:
     """Designs the scene."""
     cfg = sim_utils.GroundPlaneCfg()
     cfg.func("/World/defaultGroundPlane", cfg)
-    cfg = sim_utils.DistantLightCfg(intensity=3000.0, color=(0.75, 0.75, 0.75))
+    # cfg = sim_utils.DistantLightCfg(intensity=3000.0, color=(0.75, 0.75, 0.75))
+    cfg = sim_utils.DomeLightCfg(
+            intensity=750.0,
+            texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
+        )
     cfg.func("/World/Light", cfg)
 
     origins = [[0.0, 0.0, 0.0]]

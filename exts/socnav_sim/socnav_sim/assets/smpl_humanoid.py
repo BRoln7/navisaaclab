@@ -7,10 +7,8 @@ import os
 
 SMPL_HUMANOID_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        # usd_path=f"data/usd/robots/smpl_humanoid_neutral.usd",
         usd_path=f"data/usd/robots/new_human.usd",
         # usd_path=f"data/usd/robots/smpl_humanoid.usda",
-        # usd_path=f"data/usd/robots/smpl_humanoid_vis_mass.usd",
         copy_from_source=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=None,
@@ -20,7 +18,7 @@ SMPL_HUMANOID_CFG = ArticulationCfg(
             max_angular_velocity=10,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=True,
+            enabled_self_collisions=False,
             sleep_threshold=0.005,
             stabilization_threshold=0.001,
             solver_position_iteration_count=4,

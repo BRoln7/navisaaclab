@@ -20,27 +20,41 @@ import yaml
 import socnav_sim.tasks.socnav.crowdnav.mdp.observations as obs
 
 # fixed positions for small scenes
-num_r_store = 2
-num_p_store = 3
+# num_r_store = 2
+# num_p_store = 3
+num_r_store = 1
+num_p_store = 5
 # num_r_store = 0
 # num_p_store = 0
-joint_r_store = torch.tensor([[30, 25, 60, 25], [40, 25, 60, 30], 
-                              [50, 25, 58, 45], [100, 90, 70, 88]], device='cuda:0', dtype=torch.int)
-joint_p_store = torch.tensor([[33, 90, 60, 90], [60, 90, 33, 90], 
-                              [55, 20, 55, 45]], device='cuda:0', dtype=torch.int)
-num_r_garden = 3
-num_p_garden = 6
+# joint_r_store = torch.tensor([[30, 25, 60, 25], [40, 25, 60, 30], 
+#                               [50, 25, 58, 45], [100, 90, 70, 88]], device='cuda:0', dtype=torch.int)
+# joint_p_store = torch.tensor([[33, 90, 60, 90], [60, 90, 33, 90], 
+#                               [55, 20, 55, 45]], device='cuda:0', dtype=torch.int)
+joint_r_store = torch.tensor([[25, 30, 60, 90]], device='cuda:0', dtype=torch.int)
+joint_p_store = torch.tensor([[31, 30, 31, 90], 
+                              [60, 90, 60, 20], 
+                              [60, 30, 50, 90],
+                              [45, 90, 100, 90],
+                              [56, 51, 10, 0],], device='cuda:0', dtype=torch.int)
+# num_r_garden = 3
+# num_p_garden = 6
+num_r_garden = 1
+num_p_garden = 3
 # num_r_garden = 0
 # num_p_garden = 0
-joint_r_garden = torch.tensor([[30, 62, 48, 60], [70, 140, 85, 125], 
-                               [10, 40, 10, 60]], device='cuda:0', dtype=torch.int)
-joint_p_garden = torch.tensor([[20, 20, 50, 20], [20, 30, 50, 20], [20, 40, 50, 40], 
-                               [80, 20, 50, 20], [80, 30, 50, 20], [80, 40, 50, 40], 
-                               [10, 110, 40, 120], [10, 130, 40, 140], 
-                               [34, 82, 70, 82]], device='cuda:0', dtype=torch.int)
+# joint_r_garden = torch.tensor([[30, 62, 48, 60], [70, 140, 85, 125], 
+#                                [10, 40, 10, 60]], device='cuda:0', dtype=torch.int)
+# joint_p_garden = torch.tensor([[20, 20, 50, 20], [20, 30, 50, 20], [20, 40, 50, 40], 
+#                                [80, 20, 50, 20], [80, 30, 50, 20], [80, 40, 50, 40], 
+#                                [10, 110, 40, 120], [10, 130, 40, 140], 
+#                                [34, 82, 70, 82]], device='cuda:0', dtype=torch.int)
+joint_r_garden = torch.tensor([[25, 67, 50, 58]], device='cuda:0', dtype=torch.int)
+joint_p_garden = torch.tensor([[30, 80, 90, 85],
+                               [75, 67, 25, 53],
+                               [25, 53, 77, 54]], device='cuda:0', dtype=torch.int)
 
-traj_length_r = 400
-traj_length_p = 700
+traj_length_r = 1000
+traj_length_p = 2000
 
 def config_init():
     motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
@@ -149,6 +163,9 @@ def reset_init_state_amp_motion(
             motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, \
             root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = motion_load.sample_ref_state(env.num_envs)
 
+        # mask = spawn_p_m[8:, 0] < 95
+        # indices = torch.nonzero(~mask).squeeze() + 8
+        # root_rot[indices, :3] *= -1
         ped_asset.write_root_pose_to_sim(torch.cat([spawn_p_w_3d[ped_init_ids], 
                                                     root_rot[:, wxyz_to_xyzw][ped_init_ids]], dim=-1), 
                                                     env_ids=ped_init_ids) # type: ignore
@@ -164,6 +181,13 @@ def reset_init_state_amp_motion(
         garden_p_id = env_ids[(env_ids >= num_p_store) & (env_ids < (num_p_store + num_p_garden))]
         station_p_id = env_ids[env_ids >= (num_p_store + num_p_garden)]
         goals_p_m[station_p_id], goals_p_w[station_p_id] = map_nanager.publish_random_goal(spawn_p_w[station_p_id], map3_info, 6.0, 7.0)
+        # mask = spawn_p_m[8:, 0] < 95
+        # station_goals_m = spawn_p_m.clone()[8:]
+        # station_goals_m[mask, 1] += 40
+        # station_goals_m[~mask, 1] -= 40
+        # goals_p_m[station_p_id] = station_goals_m
+        # goals_p_w[station_p_id] = torch.cat([(goals_p_m[station_p_id, 0]*map3_info.res+map3_info.origin[0]).unsqueeze(1),
+        #                                      (goals_p_m[station_p_id, 1]*map3_info.res+map3_info.origin[1]).unsqueeze(1)], dim=-1)
 
         for id in store_p_id:
             path = planning.get_dijkstra_path(map1_info.dilated_img, 
@@ -238,8 +262,8 @@ def reset_init_state_amp_motion(
 
     # for visualize
     B, _ = trajs_r.reshape(-1, 2).shape
-    goal_r_marker.visualize(translations=torch.cat([goals_r_w, torch.zeros((num_robots,1),device='cuda:0')],
-                                                 dim=-1).reshape(-1,3))
+    # goal_r_marker.visualize(translations=torch.cat([goals_r_w, torch.zeros((num_robots,1),device='cuda:0')],
+    #                                              dim=-1).reshape(-1,3))
     traj_r_marker.visualize(translations=torch.cat([trajs_r.reshape(-1, 2),
                                                   torch.zeros((B, 1),device='cuda:0')], dim=-1))
     

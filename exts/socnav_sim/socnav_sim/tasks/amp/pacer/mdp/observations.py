@@ -47,7 +47,7 @@ if config['env']['task'] == 'Isaac-Pacer': # type: ignore
         markers={
             "waypoints": sim_utils.SphereCfg(
                 radius=0.05,
-                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.5))
+                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 1.0))
             )})
     trajectory_marker = VisualizationMarkers(trajectory_cfg)
     traj_speed = config['env']['traj_speed'] # type: ignore
@@ -82,7 +82,7 @@ class ObsComputer():
         self._traj_sample_timestep = 0.5
         self._traj_gen_init = False
         self._traj_gen = None
-        self.progress_buf = None
+        self.progress_buf = torch.zeros(num_envs, device='cuda:0', dtype=torch.long)
         self._has_upright_start = True
         self.height_meas_scale = 5
         self.num_height_points = 1024
@@ -175,7 +175,6 @@ class ObsComputer():
         env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long)
         root_pos = asset.data.root_pos_w[:, 0:3]
         self._traj_gen.reset(env_ids, root_pos)
-        self.progress_buf = torch.zeros(env.num_envs, device=env.device, dtype=torch.long)
 
         print(f"INFO: traj_gen init")
 

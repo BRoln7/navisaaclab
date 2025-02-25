@@ -14,7 +14,9 @@ from omni.isaac.lab.managers import TerminationTermCfg as DoneTerm
 from omni.isaac.lab.scene import InteractiveSceneCfg
 from omni.isaac.lab.terrains import TerrainImporterCfg
 from omni.isaac.lab.utils import configclass
-
+from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
+import omni.isaac.lab.terrains as terrain_gen
+from omni.isaac.lab.terrains.terrain_generator_cfg import TerrainGeneratorCfg  # isort: skip
 from socnav_sim.assets.smpl_humanoid import SMPL_HUMANOID_CFG
 import socnav_sim.tasks.amp.pacer.mdp as mdp
 
@@ -24,6 +26,18 @@ import socnav_sim.tasks.amp.pacer.mdp as mdp
 
 obs_computer = mdp.ObsComputer()
 
+FLAT_TERRAINS_CFG = TerrainGeneratorCfg(
+    size=(8.0, 8.0),
+    border_width=20.0,
+    num_rows=10,
+    num_cols=20,
+    horizontal_scale=0.1,
+    vertical_scale=0.005,
+    slope_threshold=0.75,
+    use_cache=False,
+    sub_terrains = {"Plane": terrain_gen.MeshPlaneTerrainCfg()}
+)
+
 @configclass
 class PacerSceneCfg(InteractiveSceneCfg):
     """Configuration for the scene with amp task."""
@@ -32,22 +46,19 @@ class PacerSceneCfg(InteractiveSceneCfg):
     ground = TerrainImporterCfg(
         prim_path="/World/ground",
         collision_group=-1,
-        terrain_type="plane",
-        visual_material = sim_utils.PreviewSurfaceCfg(
-            diffuse_color = (0.0, 0.0, 0.0),
-            opacity = 0
+        # terrain_type="plane",
+        terrain_generator=FLAT_TERRAINS_CFG,
+        max_init_terrain_level=1,
+        visual_material=sim_utils.MdlFileCfg(
+            mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
+            project_uvw=True,
+            texture_scale=(0.25, 0.25),
         ),
         physics_material=sim_utils.RigidBodyMaterialCfg(
             static_friction=1.0,
             dynamic_friction=1.0,
         ),
     )
-
-    # ground = AssetBaseCfg(
-    #     prim_path="/World/ground",
-    #     spawn=sim_utils.GroundPlaneCfg(size=(200.0, 200.0),
-    #                                    color=(0.7, 0.7, 0.7)),
-    # )
 
     # robots
     robot: ArticulationCfg = SMPL_HUMANOID_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot") # type: ignore
@@ -56,7 +67,11 @@ class PacerSceneCfg(InteractiveSceneCfg):
     light = AssetBaseCfg(
         prim_path="/World/light",
         # spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
-        spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
+        # spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
+        spawn=sim_utils.DomeLightCfg(
+            intensity=750.0,
+            texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
+        ),
     )
 
     # scene
@@ -68,7 +83,12 @@ class PacerSceneCfg(InteractiveSceneCfg):
     #         usd_path=f"/home/social-navigation/data/Omnigibson scenes/Collected_scene_1/scene_1.usd",
     #         ),
     # )
-
+    # scene = AssetBaseCfg(
+    #     prim_path="/World/scene",
+    #     spawn=sim_utils.UsdFileCfg(
+    #         usd_path=f"/home/social-navigation/socnav_sim/data/usd/obstacles.usd",
+    #         ),
+    # )
 
 ##
 # MDP settings
@@ -184,3 +204,6 @@ class PacerEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.physics_material.static_friction = 1.0
         self.sim.physics_material.dynamic_friction = 1.0
         self.sim.physics_material.restitution = 0.0
+
+        self.viewer.eye = (6.0, 6.0, 2.0)
+        self.viewer.lookat = (0.0, 0.0, 0.0)

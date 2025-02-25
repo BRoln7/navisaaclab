@@ -13,10 +13,15 @@ import omni.isaac.lab.sim as sim_utils
 import socnav_sim.tasks.socnav.nav_utils.event_base as event
 from socnav_sim.tasks.socnav.nav_utils.frame_rotation import * # type: ignore
 
+import matplotlib.pyplot as plt
+
 if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedEnv, ManagerBasedRLEnv
 
 subgoal_dist = 20
+
+# depth_image = []
+# rgb_image = []
 
 def config_init():
     motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
@@ -126,8 +131,15 @@ def compute_joint_states_obs(env: ManagerBasedEnv,
     _, N = joint_state.shape
     joint_state = torch.cat([joint_state, torch.ones(num_envs-num_robots, N, device='cuda:0')], dim=0)
 
-    subgoal_vis = torch.cat([subgoal_obs, torch.zeros(num_robots, 1, device='cuda:0')], dim=-1)
-    subgoal_marker.visualize(translations=subgoal_vis.reshape(-1, 3))
+    # subgoal_vis = torch.cat([subgoal_obs, torch.zeros(num_robots, 1, device='cuda:0')], dim=-1)
+    # subgoal_marker.visualize(translations=subgoal_vis.reshape(-1, 3))
+
+    # global depth_image, rgb_image
+    # depth_image.append(env.scene['camera'].data.output["distance_to_image_plane"][:2])
+    # rgb_image.append(env.scene['camera'].data.output["rgb"][:2])
+    # if len(depth_image) == 1000:
+    #     torch.save(torch.stack(depth_image), 'depth.pth')
+    #     torch.save(torch.stack(rgb_image), 'rgb.pth')
 
     return joint_state
 

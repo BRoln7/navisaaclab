@@ -3,6 +3,7 @@ from omni.isaac.lab.utils import configclass
 from omni.isaac.lab.managers.action_manager import ActionTerm, ActionTermCfg
 from omni.isaac.lab.envs import ManagerBasedEnv
 from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import dof_gym_to_sim
+import torch
 
 
 class JointPositionAMPAction(JointAction):
@@ -32,6 +33,8 @@ class JointPositionAMPAction(JointAction):
                             'R_Toe_x', 'R_Toe_y', 'R_Toe_z']
         freeze_joint_idx = self._asset.find_joints(freeze_joint_name)
         self._processed_actions[:, freeze_joint_idx[0]] = 0
+        self._processed_actions[:, [57, 58, 59, 60, 61, 62]] = torch.clamp(
+            self._processed_actions[:, [57, 58, 59, 60, 61, 62]], min=-0.10, max=0.10)
 
 @configclass
 class JointPositionActionAMPCfg(JointActionCfg):

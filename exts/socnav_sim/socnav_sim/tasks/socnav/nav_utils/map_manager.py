@@ -61,6 +61,13 @@ def load_image_scaled(_img_path, _yaml_path, scale=1/3, dilation_size=5):
 def random_spawn(_map_info:MapInfo, _num_agent:int):
     
     free_space_coord = np.argwhere(_map_info.dilated_img == 0)
+
+    # mask = (free_space_coord[:, 0] >= 41) & (free_space_coord[:, 0] <= 159)
+    # free_space_coord = free_space_coord[mask]
+
+    # mask1 = (free_space_coord[:, 1] > 30)
+    # free_space_coord = free_space_coord[mask1]
+
     random_pos = free_space_coord[np.random.choice(free_space_coord.shape[0], _num_agent, replace=False)]
 
     spawn_pos_m = torch.tensor(random_pos, device='cuda:0')

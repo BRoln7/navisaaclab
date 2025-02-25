@@ -28,20 +28,21 @@ with open(motion_file, 'r') as file:
     config = yaml.safe_load(file)
 fixed_pose = config['env']['fixed_pose'] # type: ignore
 
-traj_p_cfg = VisualizationMarkersCfg(
-    prim_path="/World/Visuals/TrajPedMarkers",
-    markers={
-        "traj": sim_utils.SphereCfg(
-            radius=0.025,
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 1.0)))})
-traj_p_marker = VisualizationMarkers(traj_p_cfg)
-goal_p_cfg = VisualizationMarkersCfg(
-    prim_path="/World/Visuals/GoalPedMarkers",
-    markers={
-        "goal": sim_utils.SphereCfg(
-            radius=0.05,
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 1.0)))})
-goal_p_marker = VisualizationMarkers(goal_p_cfg)
+if config['env']['task'] != 'Isaac-Pacer': # type: ignore
+    traj_p_cfg = VisualizationMarkersCfg(
+        prim_path="/World/Visuals/TrajPedMarkers",
+        markers={
+            "traj": sim_utils.SphereCfg(
+                radius=0.025,
+                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 1.0)))})
+    traj_p_marker = VisualizationMarkers(traj_p_cfg)
+    goal_p_cfg = VisualizationMarkersCfg(
+        prim_path="/World/Visuals/GoalPedMarkers",
+        markers={
+            "goal": sim_utils.SphereCfg(
+                radius=0.05,
+                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 1.0)))})
+    goal_p_marker = VisualizationMarkers(goal_p_cfg)
 
 def time_runout(env: ManagerBasedRLEnv) -> torch.Tensor:
 

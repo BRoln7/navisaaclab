@@ -15,10 +15,11 @@ from omni.isaac.lab.scene import InteractiveSceneCfg
 from omni.isaac.lab.terrains import TerrainImporterCfg
 from omni.isaac.lab.managers import SceneEntityCfg
 from omni.isaac.lab.utils import configclass
-
+from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
 from socnav_sim.assets.smpl_humanoid import SMPL_HUMANOID_CFG
 from socnav_sim.assets.nova_carter import CARTER_CFG
 from socnav_sim.tasks.socnav.nav_utils import action_base, event_base, reset_base
+from omni.isaac.lab.sensors import CameraCfg
 
 import socnav_sim.tasks.socnav.crowdnav.mdp as mdp
 ##
@@ -50,8 +51,12 @@ class CrowdnavSceneCfg(InteractiveSceneCfg):
     # lights
     light = AssetBaseCfg(
         prim_path="/World/light",
-        spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
+        # spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
         # spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
+        spawn=sim_utils.DomeLightCfg(
+            intensity=750.0,
+            texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
+        ),
     )
 
     # scene
@@ -61,6 +66,18 @@ class CrowdnavSceneCfg(InteractiveSceneCfg):
             pos=(0, 0, -0.05)),
         spawn=sim_utils.UsdFileCfg(usd_path=f"data/usd/scenes/scene_crowdnav/scene_crowdnav.usd"),
     )
+
+    # camera = CameraCfg(
+    #     prim_path="{ENV_REGEX_NS}/Robot/nova_carter/chassis_link/cam",
+    #     update_period=0.1,
+    #     height=480,
+    #     width=640,
+    #     data_types=["rgb", "distance_to_image_plane"],
+    #     spawn=sim_utils.PinholeCameraCfg(
+    #         focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+    #     ),
+    #     offset=CameraCfg.OffsetCfg(pos=(0.1205, 0.0, 0.34425), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
+    # )
 
 ##
 # MDP settings
@@ -172,3 +189,13 @@ class CrowdnavEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.physics_material.static_friction = 1.0
         self.sim.physics_material.dynamic_friction = 1.0
         self.sim.physics_material.restitution = 0.0
+
+        # room view
+        # self.viewer.eye = (-30.0, -7.0, 22.5)
+        # self.viewer.lookat = (-30.0, 6.0, 0.0)
+        # grocery view
+        # self.viewer.eye = (-30.0, 3.0, 20.0)
+        # self.viewer.lookat = (-30.0, -20.0, 0.0)
+        # station view
+        self.viewer.eye = (36.5, 3.0, 24.0)
+        self.viewer.lookat = (-50.0, 1.5, -33.0)

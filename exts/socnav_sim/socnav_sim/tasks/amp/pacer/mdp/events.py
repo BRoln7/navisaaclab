@@ -19,7 +19,8 @@ def reset_init_state_amp_motion(
     wxyz_to_xyzw = [3, 0, 1, 2]
     motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, \
       root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = policy.motion_load.sample_ref_state(env.num_envs)    
-    root_pos += env.scene.env_origins
+    # root_pos += env.scene.env_origins
+    root_pos[..., :2] = 0.0
     asset.write_root_pose_to_sim(torch.cat([root_pos[env_ids], root_rot[:, wxyz_to_xyzw][env_ids]], dim=-1), env_ids=env_ids) # type: ignore
     asset.write_root_velocity_to_sim(torch.cat([root_vel[env_ids], root_ang_vel[env_ids]], dim=-1), env_ids=env_ids) # type: ignore
     asset.write_joint_state_to_sim(position=dof_pos[:,dof_gym_to_sim][env_ids], velocity=dof_vel[:,dof_gym_to_sim][env_ids], env_ids=env_ids) # type: ignore
