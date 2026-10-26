@@ -16,6 +16,11 @@ rewards, and an explicit left-right symmetry loss. The trained policy controls
 simulated pedestrians during navigation-policy training and robot-centric RGB-D
 data collection.
 
+> **NavIsaacLab 2.0 is under active development!** Explore
+> [the 2.0 repository](https://github.com/yh83305/NavIsaaclab2.0) for richer
+> pedestrian motions and state-of-the-art navigation algorithms. We welcome
+> you to try it and share your feedback.
+
 ![SocNav with clothed SMPL pedestrians](assets/socnav-with-smpl-render.webp)
 
 ## Highlights
