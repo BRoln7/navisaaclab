@@ -76,100 +76,10 @@ then install its SMPL XML/USD assets without extracting unrelated files:
 
 ## Data setup
 
-Large scene assets, motion files, and trained checkpoints are distributed
-separately. Download the project data bundle from
-[NavIsaacLab assets on Hugging Face](https://huggingface.co/datasets/hill77/NavIsaacLab_assets)
-and extract
-it into the repository so that its top-level `data/` directory merges with the
-tracked `data/cfg/` directory.
-
-The data bundle uses this layout; configurations under `data/cfg/` are already
-included in the code repository:
-
-```text
-data/
-├── README.md
-├── cfg/                              # tracked, tuned experiment configurations
-├── checkpoints/
-│   ├── policy.pth                    # exported AMP pedestrian actor
-│   └── cadrl_policy.zip              # optional CADRL inference checkpoint
-├── mimickit/
-│   ├── amass-pacer-v1/native/
-│   │   ├── motions.yaml
-│   │   ├── manifest.json
-│   │   └── clip_*.pkl                # 248 final AMP demonstrations
-│   └── official_smpl/
-│       ├── smpl_walk.pkl
-│       ├── smpl_run.pkl
-│       └── motions.yaml              # optional official walk/run baseline
-└── usd_assets/assets/
-    ├── people/tailornet_smpl_female.usd
-    ├── robots/jackal.usda
-    └── scenes/IsaacNav scenes2/
-        └── Collected_scene_<id>/
-            ├── scene_<id>.usd
-            ├── scene_<id>_nav_map.png
-            └── scene_<id>_nav_map.yaml
-```
-
-The navigation code currently accesses assets through `data/usd/assets/`.
-After extracting the bundle, create this local alias once from the repository
-root, keeping the downloaded `usd_assets/` directory intact:
-
-```bash
-ln -s usd_assets data/usd
-```
-
-The examples below use scene 12; the scene 35 demo uses the same layout with
-`<id>` set to `35`. Keep the USD files together with all referenced materials,
-textures, meshes, and sub-assets, preserving their relative paths.
-
-| Workflow | Required files |
-| --- | --- |
-| AMP training | `data/mimickit/amass-pacer-v1/native/motions.yaml`, every motion clip it references, and the official MimicKit SMPL XML/USD assets installed above |
-| Official walk/run baseline | `data/mimickit/official_smpl/motions.yaml` and its two PKLs, with the same official SMPL XML/USD assets |
-| Navigation training and RGB-D collection | `data/checkpoints/policy.pth`, the Jackal USD and its dependencies, the selected scene USD and its dependencies, and its navigation-map PNG/YAML |
-| Clothed pedestrian rendering | Additionally, `data/usd/assets/people/tailornet_smpl_female.usd` and its dependencies; enable with `--realistic_pedestrians` |
-| Trained CADRL playback | Additionally, a CADRL `.zip` checkpoint; `data/checkpoints/cadrl_policy.zip` is an optional supplied checkpoint |
-
-The native set contains 248 clips (60,587 frames at 30 Hz), with uniform
-per-clip sampling weights of 1.0. The two official walk/run motions are a
-separate baseline and are not added to the default 248-clip training set.
-
-The tracked configurations under `data/cfg/` are also required. AMP uses
-`mimickit_amp/agent.yaml`, `engine.yaml`, `env.yaml`, and `env_tracking.yaml`.
-Navigation and collection use their selected `cadrl_scene<id>.yaml`,
-`drlvo_scene<id>.yaml`, or `egonav_scene<id>.yaml` configuration.
-
-Run motion-training and reference-review commands from the repository root;
-the motion lists use repository-relative paths. Raw AMASS archives, source
-SMPL model PKLs, old motion caches, and conversion intermediates are excluded
-from the runtime data bundle. Rebuilding requires separately obtained,
-licensed source data. AMASS, SMPL, MimicKit assets, scene assets, and
-TailorNet each retain their own licenses; obtain and redistribute them only as
-their terms permit. See [data/README.md](data/README.md) for the complete path
-reference.
-
-### SMPL source models (local only)
-
-To rebuild motion data or the clothed pedestrian mesh, register at the
-[official SMPL website](https://smpl.is.tue.mpg.de/) and download the Python
-model PKLs from its [Downloads page](https://smpl.is.tue.mpg.de/download.php).
-Place the female, male, and neutral SMPL models under these names:
-
-```text
-data/smpl/
-├── SMPL_FEMALE.pkl
-├── SMPL_MALE.pkl
-└── SMPL_NEUTRAL.pkl
-```
-
-These models stay on your local machine. `data/smpl/` is ignored by Git and
-must be excluded when packaging `data/` for Hugging Face; users download the
-models themselves under the official license. The mesh builder uses
-`data/smpl/SMPL_FEMALE.pkl` by default. Training from prepared motion clips
-and rendering the prepared clothed USD do not require these source PKLs.
-See the [mesh rebuilding instructions](docs/tailornet-pedestrians.md#rebuild-from-licensed-source-models).
+Download the data bundle from
+[Hugging Face](https://huggingface.co/datasets/hill77/NavIsaacLab_assets).
+See [data/README.md](data/README.md) for extraction, directory layout, required
+assets, and optional SMPL source-model setup.
 
 ## AMP locomotion
 
