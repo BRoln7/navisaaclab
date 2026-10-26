@@ -1,271 +1,144 @@
-from omni.isaac.lab.envs import ManagerBasedEnv
+"""Reset events for map-based social navigation."""
+
+from __future__ import annotations
+
 import torch
-from omni.isaac.lab.managers import SceneEntityCfg
-from omni.isaac.lab.assets import Articulation, RigidObject
-from socnav_sim.tasks.amp.amp_utils.utils.obs_utils import (
-    dof_gym_to_sim,
-    root_pos_init,
-    root_rot_init,
-    root_vel_init,
-    root_ang_vel_init,
-    dof_pos_init,
-    dof_vel_init)
-from socnav_sim.tasks.amp.amp_utils.utils.load_motion import MotionLoad
-from omni.isaac.lab.markers import VisualizationMarkersCfg, VisualizationMarkers
-import omni.isaac.lab.sim as sim_utils
-import socnav_sim.tasks.socnav.nav_utils.map_manager as map_nanager
-import socnav_sim.tasks.socnav.nav_utils.planning as planning
-import os
-import yaml
-import socnav_sim.tasks.socnav.crowdnav.mdp.observations as obs
+import isaaclab.sim as sim_utils
+from isaaclab.assets import Articulation
+from isaaclab.envs import ManagerBasedEnv
+from isaaclab.managers import SceneEntityCfg
+from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
 
-# fixed positions for small scenes
-# num_r_store = 2
-# num_p_store = 3
-num_r_store = 1
-num_p_store = 5
-# num_r_store = 0
-# num_p_store = 0
-# joint_r_store = torch.tensor([[30, 25, 60, 25], [40, 25, 60, 30], 
-#                               [50, 25, 58, 45], [100, 90, 70, 88]], device='cuda:0', dtype=torch.int)
-# joint_p_store = torch.tensor([[33, 90, 60, 90], [60, 90, 33, 90], 
-#                               [55, 20, 55, 45]], device='cuda:0', dtype=torch.int)
-joint_r_store = torch.tensor([[25, 30, 60, 90]], device='cuda:0', dtype=torch.int)
-joint_p_store = torch.tensor([[31, 30, 31, 90], 
-                              [60, 90, 60, 20], 
-                              [60, 30, 50, 90],
-                              [45, 90, 100, 90],
-                              [56, 51, 10, 0],], device='cuda:0', dtype=torch.int)
-# num_r_garden = 3
-# num_p_garden = 6
-num_r_garden = 1
-num_p_garden = 3
-# num_r_garden = 0
-# num_p_garden = 0
-# joint_r_garden = torch.tensor([[30, 62, 48, 60], [70, 140, 85, 125], 
-#                                [10, 40, 10, 60]], device='cuda:0', dtype=torch.int)
-# joint_p_garden = torch.tensor([[20, 20, 50, 20], [20, 30, 50, 20], [20, 40, 50, 40], 
-#                                [80, 20, 50, 20], [80, 30, 50, 20], [80, 40, 50, 40], 
-#                                [10, 110, 40, 120], [10, 130, 40, 140], 
-#                                [34, 82, 70, 82]], device='cuda:0', dtype=torch.int)
-joint_r_garden = torch.tensor([[25, 67, 50, 58]], device='cuda:0', dtype=torch.int)
-joint_p_garden = torch.tensor([[30, 80, 90, 85],
-                               [75, 67, 25, 53],
-                               [25, 53, 77, 54]], device='cuda:0', dtype=torch.int)
+from .pedestrian_policy import SMPL_JOINT_NAMES
+from .state import NavigationRuntimeCfg, get_navigation_state
 
-traj_length_r = 1000
-traj_length_p = 2000
 
-def config_init():
-    motion_file = os.path.join(os.getcwd(), 'data', 'cfg', 'task.yaml')
-    with open(motion_file, 'r') as file:
-        config = yaml.safe_load(file)
-        global num_envs, num_robots,  num_r_station, num_p_station, fixed_pose
-        num_envs = config['env']['num_envs'] # type: ignore
-        # num_envs = 16
-        num_robots = config['env']['num_robots'] # type: ignore
-        num_r_station = max(num_robots - num_r_store - num_r_garden, 1)
-        num_p_station = max(num_envs - num_p_store - num_p_garden, 2)
-
-    if config['env']['task'] != 'Isaac-Pacer': # type: ignore
-        global motion_load, goal_r_marker, traj_r_marker, ped_init, trajs_r, trajs_p
-
-        fixed_pose = config['env']['fixed_pose'] # type: ignore
-        if not fixed_pose:
-            motion_load = MotionLoad(num_envs)
-        ped_init = False
-
-        goal_r_cfg = VisualizationMarkersCfg(
-            prim_path="/World/Visuals/GoalRobotMarkers",
-            markers={
-                "goal": sim_utils.SphereCfg(
-                    radius=0.05,
-                    visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)))})
-        goal_r_marker = VisualizationMarkers(goal_r_cfg)
-        traj_r_cfg = VisualizationMarkersCfg(
-            prim_path="/World/Visuals/TrajRobotMarkers",
-            markers={
-                "traj": sim_utils.SphereCfg(
-                    radius=0.025,
-                    visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)))})
-        traj_r_marker = VisualizationMarkers(traj_r_cfg)
-
-        trajs_r = torch.zeros(num_robots, traj_length_r, 2, device='cuda:0')
-        trajs_p = torch.zeros(num_envs, traj_length_p, 2, device='cuda:0')
-        
-config_init()
-
-dilated_img1, binary_img1, res1, origin1 = map_nanager.load_image_scaled("data/usd/scenes/scene_crowdnav/store_map.png",
-                                                                         "data/usd/scenes/scene_crowdnav/store_map.yaml",
-                                                                     1/4, 4)
-dilated_img2, binary_img2, res2, origin2 = map_nanager.load_image_scaled("data/usd/scenes/scene_crowdnav/garden_map.png",
-                                                                         "data/usd/scenes/scene_crowdnav/garden_map.yaml",
-                                                                     1/4, 4)
-dilated_img3, binary_img3, res3, origin3 = map_nanager.load_image_scaled("data/usd/scenes/scene_crowdnav/station_map.png",
-                                                                         "data/usd/scenes/scene_crowdnav/station_map.yaml",
-                                                                     1/4, 4)
-map1_info = map_nanager.MapInfo(dilated_img=dilated_img1, binary_img=binary_img1, res=res1, origin=origin1)
-map2_info = map_nanager.MapInfo(dilated_img=dilated_img2, binary_img=binary_img2, res=res2, origin=origin2)
-map3_info = map_nanager.MapInfo(dilated_img=dilated_img3, binary_img=binary_img3, res=res3, origin=origin3)
-
-# goals of station should be published randomly in the events
-spawn_r_m, spawn_r_w, goals_r_w, goals_r_m = map_nanager.get_spawn_and_goal(num_robots, num_r_store, num_r_garden, 
-                                                                            num_r_station, joint_r_store, joint_r_garden, 
-                                                                            map1_info, map2_info, map3_info)
-spawn_p_m, spawn_p_w, goals_p_w, goals_p_m = map_nanager.get_spawn_and_goal(num_envs, num_p_store, num_p_garden, 
-                                                                            num_p_station, joint_p_store, joint_p_garden, 
-                                                                            map1_info, map2_info, map3_info)
-
-# spawn_p_m, spawn_p_w = map_nanager.random_spawn(map3_info, 2)
-# goals_p_w, goals_p_m = torch.zeros_like(spawn_p_m, device='cuda:0', dtype=torch.float), torch.zeros_like(spawn_p_w, device='cuda:0', dtype=torch.int)
-# spawn_r_m, spawn_r_w = map_nanager.random_spawn(map3_info, 1)
-# goals_r_w, goals_r_m = torch.zeros_like(spawn_r_m, device='cuda:0', dtype=torch.float), torch.zeros_like(spawn_r_w, device='cuda:0', dtype=torch.int)
-
-spawn_p_w_3d = torch.cat([spawn_p_w, torch.ones(num_envs, 1, device='cuda:0')*0.9556],dim=-1)
-
-# import matplotlib.pyplot as plt
-# plt.imshow(dilated_img, cmap='gray')
-
-def reset_init_state_amp_motion(
+def reset_pedestrian_assets(
     env: ManagerBasedEnv,
     env_ids: torch.Tensor,
+    *,
+    replan: bool = True,
+    pedestrian_asset_cfg: SceneEntityCfg = SceneEntityCfg("ped"),
+) -> None:
+    """Reset only selected humanoids without ending their paired robot episodes."""
+    state = get_navigation_state(env)
+    env_ids = env_ids.to(device=env.device, dtype=torch.long)
+    if replan:
+        state.reset_pedestrians(env_ids, sample_spawn=True)
+    pedestrian: Articulation = env.scene[pedestrian_asset_cfg.name]
+    count = env_ids.numel()
+    root_pose = torch.empty((count, 7), device=env.device)
+    root_pose[:, :2] = state.pedestrian_spawns[env_ids]
+    root_pose[:, 2] = 0.9
+    root_pose[:, 3:] = 0.0
+    root_pose[:, 3] = 1.0
+    root_velocity = torch.zeros((count, 6), device=env.device)
+    joint_ids, names = pedestrian.find_joints(
+        [f"^{name}$" for name in SMPL_JOINT_NAMES], preserve_order=True
+    )
+    if names != SMPL_JOINT_NAMES:
+        raise RuntimeError("Navigation SMPL USD joint order differs from MimicKit")
+    joint_position = torch.zeros((count, len(joint_ids)), device=env.device)
+    # Match MimicKit's neutral pose: arms hang along the body's sides.
+    joint_position[:, SMPL_JOINT_NAMES.index("L_Shoulder_x")] = -1.5708
+    joint_position[:, SMPL_JOINT_NAMES.index("R_Shoulder_x")] = 1.5708
+    joint_velocity = torch.zeros_like(joint_position)
+    pedestrian.write_root_pose_to_sim(root_pose, env_ids=env_ids)
+    pedestrian.write_root_velocity_to_sim(root_velocity, env_ids=env_ids)
+    pedestrian.write_joint_state_to_sim(
+        joint_position, joint_velocity, joint_ids=joint_ids, env_ids=env_ids
+    )
+    pedestrian.set_joint_position_target(joint_position, joint_ids=joint_ids, env_ids=env_ids)
+
+
+def reset_navigation(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor,
+    active_robot_count: int,
+    pedestrian_speed: float = 0.85,
+    pedestrian_speed_variation: float = 0.15,
+    fast_pedestrian_probability: float = 0.10,
+    fast_pedestrian_speed: float = 1.20,
+    fast_pedestrian_speed_variation: float = 0.15,
+    pedestrian_acceleration_max: float = 2.0,
+    pedestrian_turn_rate_max: float = 2.0,
+    path_spacing: float = 0.10,
+    robot_goal_min: float = 4.0,
+    robot_goal_max: float = 8.0,
+    pedestrian_goal_min: float = 6.0,
+    pedestrian_goal_max: float = 10.0,
+    map_scale: float = 0.25,
+    map_dilation: int = 7,
+    map_image_path: str = "",
+    map_yaml_path: str = "",
+    visualize_paths: bool = False,
     robot_asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-    ped_asset_cfg: SceneEntityCfg = SceneEntityCfg("ped"),
-):
-    '''
-    peds would continuously walk following trajs. Here peds only reset once just at the initial phrase
-    robots would reset to the default places
-    '''
+    pedestrian_asset_cfg: SceneEntityCfg = SceneEntityCfg("ped"),
+) -> None:
+    """Reset requested agents and rebuild their collision-aware global paths."""
+    runtime_cfg = NavigationRuntimeCfg(
+        active_robot_count=active_robot_count,
+        pedestrian_speed=pedestrian_speed,
+        pedestrian_speed_variation=pedestrian_speed_variation,
+        fast_pedestrian_probability=fast_pedestrian_probability,
+        fast_pedestrian_speed=fast_pedestrian_speed,
+        fast_pedestrian_speed_variation=fast_pedestrian_speed_variation,
+        pedestrian_acceleration_max=pedestrian_acceleration_max,
+        pedestrian_turn_rate_max=pedestrian_turn_rate_max,
+        path_spacing=path_spacing,
+        robot_goal_distance=(robot_goal_min, robot_goal_max),
+        pedestrian_goal_distance=(pedestrian_goal_min, pedestrian_goal_max),
+        map_scale=map_scale,
+        map_dilation=map_dilation,
+        map_image_path=map_image_path,
+        map_yaml_path=map_yaml_path,
+    )
+    state = get_navigation_state(env, runtime_cfg)
+    first_reset = not state.initialized
+    state.initialize()
+    env_ids = env_ids.to(device=env.device, dtype=torch.long)
+    if not first_reset:
+        state.reset_robots(env_ids, sample_spawn=True)
+        state.reset_pedestrians(env_ids, sample_spawn=True)
 
-    ##################### for peds init, just reset and planning once #######################
-    ped_asset: RigidObject | Articulation = env.scene[ped_asset_cfg.name]
+    robot: Articulation = env.scene[robot_asset_cfg.name]
+    robot_root = robot.data.default_root_state[env_ids].clone()
+    robot_root[:, :2] = state.robot_spawns[env_ids]
+    robot_root[:, 7:] = 0.0
+    robot.write_root_pose_to_sim(robot_root[:, :7], env_ids=env_ids)
+    robot.write_root_velocity_to_sim(robot_root[:, 7:], env_ids=env_ids)
+    robot.write_joint_state_to_sim(
+        robot.data.default_joint_pos[env_ids], robot.data.default_joint_vel[env_ids], env_ids=env_ids
+    )
 
-    store_r_id = env_ids[env_ids < num_r_store]
-    garden_r_id = env_ids[(env_ids >= num_r_store) & (env_ids < (num_r_store + num_r_garden))]
-    station_r_id = env_ids[(env_ids >= (num_r_store + num_r_garden)) & (env_ids < num_robots)]
-    
-    global ped_init, goals_r_w, goals_r_m, trajs_r
-    if not ped_init:
-        ped_init = True
-        ped_init_ids = torch.arange(env.num_envs, device='cuda:0')
-        wxyz_to_xyzw = [3, 0, 1, 2]
-        if fixed_pose:
-            root_pos, root_rot, dof_pos, \
-                root_vel, root_ang_vel, dof_vel = root_pos_init, root_rot_init, dof_pos_init,\
-                root_vel_init, root_ang_vel_init, dof_vel_init
-            root_pos = root_pos.repeat(env.num_envs, 1)
-            root_rot = root_rot.repeat(env.num_envs, 1)
-            dof_pos = dof_pos.repeat(env.num_envs, 1)
-            root_vel = root_vel.repeat(env.num_envs, 1)
-            root_ang_vel = root_ang_vel.repeat(env.num_envs, 1)
-            dof_vel = dof_vel.repeat(env.num_envs, 1)
-        else:
-            motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, \
-            root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = motion_load.sample_ref_state(env.num_envs)
+    reset_pedestrian_assets(
+        env, env_ids, replan=False, pedestrian_asset_cfg=pedestrian_asset_cfg
+    )
+    if visualize_paths:
+        _visualize_robot_paths(env, state)
 
-        # mask = spawn_p_m[8:, 0] < 95
-        # indices = torch.nonzero(~mask).squeeze() + 8
-        # root_rot[indices, :3] *= -1
-        ped_asset.write_root_pose_to_sim(torch.cat([spawn_p_w_3d[ped_init_ids], 
-                                                    root_rot[:, wxyz_to_xyzw][ped_init_ids]], dim=-1), 
-                                                    env_ids=ped_init_ids) # type: ignore
-        ped_asset.write_root_velocity_to_sim(torch.cat([root_vel[ped_init_ids], 
-                                                        root_ang_vel[ped_init_ids]], dim=-1), 
-                                                        env_ids=ped_init_ids) # type: ignore
-        ped_asset.write_joint_state_to_sim(position=dof_pos[:,dof_gym_to_sim][ped_init_ids],  # type: ignore
-                                           velocity=dof_vel[:,dof_gym_to_sim][ped_init_ids], 
-                                           env_ids=ped_init_ids) # type: ignore
-        
-        global goals_p_w, goals_p_m
-        store_p_id = env_ids[env_ids < num_p_store]
-        garden_p_id = env_ids[(env_ids >= num_p_store) & (env_ids < (num_p_store + num_p_garden))]
-        station_p_id = env_ids[env_ids >= (num_p_store + num_p_garden)]
-        goals_p_m[station_p_id], goals_p_w[station_p_id] = map_nanager.publish_random_goal(spawn_p_w[station_p_id], map3_info, 6.0, 7.0)
-        # mask = spawn_p_m[8:, 0] < 95
-        # station_goals_m = spawn_p_m.clone()[8:]
-        # station_goals_m[mask, 1] += 40
-        # station_goals_m[~mask, 1] -= 40
-        # goals_p_m[station_p_id] = station_goals_m
-        # goals_p_w[station_p_id] = torch.cat([(goals_p_m[station_p_id, 0]*map3_info.res+map3_info.origin[0]).unsqueeze(1),
-        #                                      (goals_p_m[station_p_id, 1]*map3_info.res+map3_info.origin[1]).unsqueeze(1)], dim=-1)
 
-        for id in store_p_id:
-            path = planning.get_dijkstra_path(map1_info.dilated_img, 
-                                              map1_info.binary_img, 
-                                              tuple(spawn_p_m[id].cpu().numpy()), 
-                                              tuple(goals_p_m[id].cpu().numpy()),
-                                              traj_optim=True)
-            path = planning.path_align_length(path, traj_length_p)
-            path = map_nanager.transform_map_to_world(path, map1_info)
-            trajs_p[id] = path
-        for id in garden_p_id:
-            path = planning.get_dijkstra_path(map2_info.dilated_img, 
-                                              map2_info.binary_img, 
-                                              tuple(spawn_p_m[id].cpu().numpy()), 
-                                              tuple(goals_p_m[id].cpu().numpy()),
-                                              traj_optim=True)
-            path = planning.path_align_length(path, traj_length_p)
-            path = map_nanager.transform_map_to_world(path, map2_info)
-            trajs_p[id] = path
-        for id in station_p_id:
-            path = planning.get_dijkstra_path(map3_info.dilated_img, 
-                                              map3_info.binary_img, 
-                                              tuple(spawn_p_m[id].cpu().numpy()), 
-                                              tuple(goals_p_m[id].cpu().numpy()),
-                                              traj_optim=True)
-            path = planning.path_align_length(path, traj_length_p)
-            path = map_nanager.transform_map_to_world(path, map3_info)
-            trajs_p[id] = path
-
-    ###################### for robots reset ########################
-    robot_asset: RigidObject | Articulation = env.scene[robot_asset_cfg.name]
-    
-    root_pose_default = robot_asset.data.default_root_state.clone()[:, :7]
-    root_pose_default[num_robots:, :2] += 100
-    root_pose_default[..., :3] += env.scene.env_origins
-    root_pose_default[:num_robots, :2] = spawn_r_w
-
-    robot_asset.write_root_pose_to_sim(root_pose_default[env_ids], env_ids=env_ids) # type: ignore
-    
-    ############################## path planning for robots ###############################
-    if spawn_r_w[station_r_id].numel() != 0:
-        goals_r_m[station_r_id], goals_r_w[station_r_id] = map_nanager.publish_random_goal(spawn_r_w[station_r_id], 
-                                                                                           map3_info, 4.0, 5.0)
-    # path planning and lenght alignment
-    for id in store_r_id:
-        path = planning.get_dijkstra_path(map1_info.dilated_img, 
-                                          map1_info.binary_img, 
-                                          tuple(spawn_r_m[id].cpu().numpy()), 
-                                          tuple(goals_r_m[id].cpu().numpy()),
-                                          traj_optim=True)
-        path = planning.path_align_length(path, traj_length_r)
-        path = map_nanager.transform_map_to_world(path, map1_info)
-        trajs_r[id] = path
-    for id in garden_r_id:
-        path = planning.get_dijkstra_path(map2_info.dilated_img, 
-                                          map2_info.binary_img, 
-                                          tuple(spawn_r_m[id].cpu().numpy()), 
-                                          tuple(goals_r_m[id].cpu().numpy()),
-                                          traj_optim=True)
-        path = planning.path_align_length(path, traj_length_r)
-        path = map_nanager.transform_map_to_world(path, map2_info)
-        trajs_r[id] = path
-    for id in station_r_id:
-        path = planning.get_dijkstra_path(map3_info.dilated_img,
-                                          map3_info.binary_img,
-                                          tuple(spawn_r_m[id].cpu().numpy()), 
-                                          tuple(goals_r_m[id].cpu().numpy()),
-                                          traj_optim=True)
-        path = planning.path_align_length(path, traj_length_r)
-        path = map_nanager.transform_map_to_world(path, map3_info)
-        trajs_r[id] = path
-
-    # for visualize
-    B, _ = trajs_r.reshape(-1, 2).shape
-    # goal_r_marker.visualize(translations=torch.cat([goals_r_w, torch.zeros((num_robots,1),device='cuda:0')],
-    #                                              dim=-1).reshape(-1,3))
-    traj_r_marker.visualize(translations=torch.cat([trajs_r.reshape(-1, 2),
-                                                  torch.zeros((B, 1),device='cuda:0')], dim=-1))
-    
-    robot_id = env_ids[env_ids < num_robots]
-    obs.last_dg[robot_id] = 0.0
+def _visualize_robot_paths(env: ManagerBasedEnv, state) -> None:
+    marker = getattr(env, "_socnav_robot_path_marker", None)
+    if marker is None:
+        marker = VisualizationMarkers(
+            VisualizationMarkersCfg(
+                prim_path="/World/Visuals/SocNav/RobotPaths",
+                markers={
+                    "path": sim_utils.SphereCfg(
+                        radius=0.04,
+                        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.1, 0.45, 1.0)),
+                    )
+                },
+            )
+        )
+        setattr(env, "_socnav_robot_path_marker", marker)
+    points = [
+        state.robot_paths[index, : int(state.robot_path_lengths[index].item())]
+        for index in range(state.active_robot_count)
+    ]
+    if points:
+        points_xy = torch.cat(points, dim=0)
+        marker.visualize(
+            translations=torch.cat((points_xy, torch.full_like(points_xy[:, :1], 0.05)), dim=-1)
+        )

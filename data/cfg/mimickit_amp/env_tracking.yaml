@@ -1,0 +1,8 @@
+# Optional trajectory task; the shared agent.yaml remains unchanged.
+base: data/cfg/mimickit_amp/env.yaml
+tracking:
+  enabled: true
+  # Calibrated from the zero-power tracking policy: ordinary motion averages
+  # 1.74 kW, while high torso/chest wobble averages 8.38 kW.  With the 0.5
+  # task-reward weight this costs about 0.009 and 0.042 reward respectively.
+  power_coefficient: 3.0e-5

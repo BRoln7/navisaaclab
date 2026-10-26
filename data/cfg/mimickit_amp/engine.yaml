@@ -1,0 +1,3 @@
+base: third_party/MimicKit/data/engines/isaac_lab_engine.yaml
+smpl_usd: third_party/MimicKit/data/assets/smpl/smpl.usd
+enable_self_collisions: true

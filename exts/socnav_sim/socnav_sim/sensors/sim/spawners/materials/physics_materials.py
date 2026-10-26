@@ -7,11 +7,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import omni.isaac.core.utils.prims as prim_utils
-import omni.isaac.core.utils.stage as stage_utils
+import isaacsim.core.utils.prims as prim_utils
+import isaacsim.core.utils.stage as stage_utils
 from pxr import PhysxSchema, Usd, UsdPhysics, UsdShade
 
-from omni.isaac.lab.sim.utils import clone, safe_set_attribute_on_usd_schema
+from isaaclab.sim.utils import clone, safe_set_attribute_on_usd_schema
 
 if TYPE_CHECKING:
     from . import physics_materials_cfg

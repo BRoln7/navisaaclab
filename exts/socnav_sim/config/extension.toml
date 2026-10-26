@@ -7,17 +7,17 @@ version = "0.1.0"
 category = "isaaclab"
 readme  = "README.md"
 
-title = "Extension Template"
+title = "NavIsaacLab"
 author = "Isaac Lab Project Developers"
 maintainer = "Isaac Lab Project Developers"
-description="Extension Template for Isaac Lab"
-repository = "https://github.com/isaac-sim/IsaacLabExtensionTemplate.git"
-keywords = ["extension", "template", "isaaclab"]
+description="Isaac Lab social-navigation simulator with AMP-driven SMPL pedestrians"
+repository = "https://github.com/BRoln7/socnav_sim.git"
+keywords = ["isaaclab", "social-navigation", "amp", "smpl"]
 
 [dependencies]
-"omni.isaac.lab" = {}
-"omni.isaac.lab_assets" = {}
-"omni.isaac.lab_tasks" = {}
+"isaaclab" = {}
+"isaaclab_assets" = {}
+"isaaclab_tasks" = {}
 # NOTE: Add additional dependencies here
 
 [[python.module]]

@@ -1,326 +1,186 @@
+"""Occupancy-map loading and coordinate conversions for navigation scenes.
+
+This module deliberately has no Isaac Sim or CUDA side effects.  The map is
+loaded only when an environment is created, which keeps task discovery cheap
+and makes the planning code usable in CPU-only tests and tools.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
 import torch
 import yaml
-import random
-import cv2
-import numpy as np
 from PIL import Image
-import scipy.ndimage as ndimage
-from dataclasses import dataclass
+from scipy import ndimage
 
-@dataclass
+from socnav_sim.config import PROJECT_ROOT
+
+
+ISAACNAV_SCENES_DIR = PROJECT_ROOT / "data/usd/assets/scenes/IsaacNav scenes2"
+
+
+@dataclass(frozen=True)
+class NavigationSceneAssets:
+    scene_id: int
+    usd: Path
+    map_image: Path
+    map_yaml: Path
+
+
+def get_navigation_scene_assets(scene_id: int) -> NavigationSceneAssets:
+    """Return and validate the assets for an IsaacNav navigation example."""
+    if scene_id not in (12, 27, 34, 35):
+        raise ValueError(
+            f"Only the open-source CADRL examples 12, 27, 34 and 35 are supported, got {scene_id}."
+        )
+    directory = ISAACNAV_SCENES_DIR / f"Collected_scene_{scene_id}"
+    usd_name = f"scene_{scene_id}_cadrl.usda" if scene_id == 34 else f"scene_{scene_id}.usd"
+    assets = NavigationSceneAssets(
+        scene_id=scene_id,
+        usd=directory / usd_name,
+        map_image=directory / f"scene_{scene_id}_nav_map.png",
+        map_yaml=directory / f"scene_{scene_id}_nav_map.yaml",
+    )
+    missing = [path for path in (assets.usd, assets.map_image, assets.map_yaml) if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(f"Scene {scene_id} is incomplete: {missing}")
+    return assets
+
+
+@dataclass(frozen=True)
 class MapInfo:
-    dilated_img: np.array
-    binary_img : np.array
-    res : float
-    origin : np.array
+    """A planning grid and its relation to world coordinates.
 
-def load_map(_png_path, _yaml_path):
-    yaml_path = _yaml_path
-    png_path = _png_path
+    Array coordinates are ``[row(y), column(x)]``.  Public map coordinates are
+    ``[x, y]`` so their order matches world positions.
+    """
 
-    with open(yaml_path, 'r') as file:
-        map_yaml = yaml.safe_load(file)
-    resolution = map_yaml['resolution'] # type: ignore
-    origin = map_yaml['origin'] # type: ignore
-    
-    map_image = Image.open(png_path)
-    map_image = map_image.convert('L')
-    map_image = map_image.transpose(method=Image.Transpose.FLIP_TOP_BOTTOM)
-    binary_map = np.array(map_image)
-    binary_map[binary_map < 128] = 1
-    binary_map[binary_map >= 128] = 0
-    structure_element = np.ones((25, 25))
-    binary_map = ndimage.binary_dilation(binary_map, 
-                                         structure=structure_element).astype(binary_map.dtype)
+    occupancy: np.ndarray
+    raw_occupancy: np.ndarray
+    resolution: float
+    origin: np.ndarray
 
-    return binary_map, resolution, origin
+    @property
+    def dilated_img(self) -> np.ndarray:
+        """Compatibility alias used by old callers."""
+        return self.occupancy
 
-def load_image_scaled(_img_path, _yaml_path, scale=1/3, dilation_size=5):
-    '''
-    scale: 1080 figure ---> 1080/3
-    '''
-    with open(_yaml_path, 'r') as file:
-        map_yaml = yaml.safe_load(file)
-    resolution = map_yaml['resolution'] # type: ignore
-    res = resolution / scale
-    origin = map_yaml['origin'] # type: ignore    
+    @property
+    def binary_img(self) -> np.ndarray:
+        """Compatibility alias used by old callers."""
+        return self.raw_occupancy
 
-    img = cv2.imread(_img_path, cv2.IMREAD_GRAYSCALE)
-    img = cv2.flip(img, 0)
-    print(img.shape)
+    @property
+    def res(self) -> float:
+        """Compatibility alias used by old callers."""
+        return self.resolution
 
-    img = cv2.resize(img, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST)
-    
-    _, binary_img = cv2.threshold(img, 126, 1, cv2.THRESH_BINARY_INV)
-    _, binary_img2 = cv2.threshold(img, 126, 1, cv2.THRESH_BINARY)
-    kernel = np.ones((dilation_size, dilation_size), np.uint8)
-    dilated_img = cv2.dilate(binary_img, kernel, iterations=1)
+    @property
+    def free_cells_xy(self) -> np.ndarray:
+        cells_yx = np.argwhere(self.occupancy == 0)
+        return cells_yx[:, ::-1].copy()
 
-    return dilated_img, binary_img, res, origin
+    def map_to_world_numpy(self, positions_xy: np.ndarray) -> np.ndarray:
+        positions = np.asarray(positions_xy, dtype=np.float32)
+        return positions * self.resolution + self.origin[:2]
 
-def random_spawn(_map_info:MapInfo, _num_agent:int):
-    
-    free_space_coord = np.argwhere(_map_info.dilated_img == 0)
+    def world_to_map_numpy(self, positions_xy: np.ndarray) -> np.ndarray:
+        positions = np.asarray(positions_xy, dtype=np.float32)
+        return np.rint((positions - self.origin[:2]) / self.resolution).astype(np.int64)
 
-    # mask = (free_space_coord[:, 0] >= 41) & (free_space_coord[:, 0] <= 159)
-    # free_space_coord = free_space_coord[mask]
+    def is_free_xy(self, cell_xy: np.ndarray | tuple[int, int]) -> bool:
+        x, y = np.asarray(cell_xy, dtype=np.int64).tolist()
+        rows, cols = self.occupancy.shape
+        return 0 <= x < cols and 0 <= y < rows and self.occupancy[y, x] == 0
 
-    # mask1 = (free_space_coord[:, 1] > 30)
-    # free_space_coord = free_space_coord[mask1]
+    def sample_free_cells(self, count: int, rng: np.random.Generator) -> np.ndarray:
+        free = self.free_cells_xy
+        if free.shape[0] == 0:
+            raise RuntimeError("The occupancy map contains no free cells.")
+        indices = rng.choice(free.shape[0], size=count, replace=count > free.shape[0])
+        return free[indices]
 
-    random_pos = free_space_coord[np.random.choice(free_space_coord.shape[0], _num_agent, replace=False)]
-
-    spawn_pos_m = torch.tensor(random_pos, device='cuda:0')
-    spawn_pos_m = torch.flip(spawn_pos_m, dims=[-1])
-
-    spawn_pos_w = transform_map_to_world(spawn_pos_m.float(), _map_info)
-
-    return spawn_pos_m.to(torch.int), spawn_pos_w.to(torch.float)
-
-def publish_random_goal(_start_points:torch.tensor, _map_info:MapInfo, _min_length, _max_lenght):
-    '''
-    set a annular region centered at start point
-    then randomly select from this region
-    '''
-    min_radius = _min_length
-    max_radius = _max_lenght
-
-    rows, cols = _map_info.dilated_img.shape
-    sampled_goals_w = []
-    sampled_goals_m = []
-    robot_poses = _start_points
-
-    for robot_pos in robot_poses:
-        x_world, y_world = robot_pos
-        x_idx = int((x_world - _map_info.origin[0]) / _map_info.res)
-        y_idx = int((y_world - _map_info.origin[1]) / _map_info.res)
-        
-        while True:
-            angle = random.uniform(0, 2 * np.pi)
-            distance = random.uniform(min_radius, max_radius)
-            
-            dx = int(distance * np.cos(angle) / _map_info.res)
-            dy = int(distance * np.sin(angle) / _map_info.res)
-            sample_x = x_idx + dx
-            sample_y = y_idx + dy
-            
-            if 0 <= sample_x < cols and 0 <= sample_y < rows:
-                if _map_info.dilated_img[sample_y, sample_x] == 0:
-                    sampled_goals_w.append(torch.tensor((sample_x*_map_info.res+_map_info.origin[0], 
-                                                         sample_y*_map_info.res+_map_info.origin[1]),
-                                                         device='cuda:0'))
-                    sampled_goals_m.append(torch.tensor([sample_x, sample_y], device='cuda:0'))
-                    break
-        
-    sampled_goals_w = torch.stack(sampled_goals_w)
-    sampled_goals_m = torch.stack(sampled_goals_m).to(torch.int)
-
-    return sampled_goals_m, sampled_goals_w
-
-def transform_map_to_world(_pos_map:torch.tensor, _map_info:MapInfo):
-    pos_map = _pos_map.to(torch.float)
-    pos_world = torch.zeros_like(_pos_map, device='cuda:0', dtype=torch.float)
-    pos_world[:, 0] = pos_map[:, 0] * _map_info.res + _map_info.origin[0]
-    pos_world[:, 1] = pos_map[:, 1] * _map_info.res + _map_info.origin[1]
-    
-    return pos_world
-
-def transform_world_to_map(_pos_world:torch.tensor, _map_info:MapInfo):
-    pos_map = torch.zeros_like(_pos_world, device='cuda:0', dtype=torch.int)
-    
-    pos_map[:, 0] = (_pos_world[:, 0] - _map_info.origin[0]) / _map_info.res
-    pos_map[:, 1] = (_pos_world[:, 1] - _map_info.origin[1]) / _map_info.res
-
-    pos_map = pos_map.to(torch.int)
-    
-    return pos_map
-
-def get_spawn_and_goal(num_robots:int, num_store:int, num_garden:int, num_station:int, 
-                       joint_store, joint_garden, map1_info, map2_info, map3_info):
-    # get spawn for robot, get goals for robot in small scene
-
-    goals_w = torch.ones((num_robots, 2),device='cuda:0')
-    goals_m = torch.ones((num_robots, 2),device='cuda:0', dtype=torch.int)
-
-    env_ids = torch.arange(num_robots, device='cuda:0')
-    store_id_0 = env_ids[env_ids < num_store]
-    garden_id_0 = env_ids[(env_ids >= num_store) & (env_ids < (num_store + num_garden))]  
-
-    path_store_m = joint_store[torch.randperm(joint_store.size(0))[:num_store].numpy().tolist()]
-    spawn_store_m, goal_store_m = path_store_m[:, :2], path_store_m[:, 2:]
-    spawn_store_w, goal_store_w = transform_map_to_world(spawn_store_m, map1_info), \
-                                  transform_map_to_world(goal_store_m, map1_info)
-    goals_w[store_id_0], goals_m[store_id_0] = goal_store_w, goal_store_m
-
-    path_garden_m = joint_garden[torch.randperm(joint_garden.size(0))[:num_garden].numpy().tolist()]
-    spawn_garden_m, goal_garden_m = path_garden_m[:, :2], path_garden_m[:, 2:]
-    spawn_garden_w, goal_garden_w = transform_map_to_world(spawn_garden_m, map2_info), \
-                                    transform_map_to_world(goal_garden_m, map2_info)
-    goals_w[garden_id_0], goals_m[garden_id_0] = goal_garden_w, goal_garden_m
-
-    spawn_station_m, spawn_station_w = random_spawn(map3_info, num_station)
-
-    spawn_m = torch.cat([spawn_store_m, spawn_garden_m, spawn_station_m], dim=0).to(torch.int)
-    spawn_w = torch.cat([spawn_store_w, spawn_garden_w, spawn_station_w], dim=0)
-
-    return spawn_m, spawn_w, goals_w, goals_m
+    def sample_goal(
+        self,
+        start_world: np.ndarray,
+        min_distance: float,
+        max_distance: float,
+        rng: np.random.Generator,
+    ) -> np.ndarray:
+        free_world = self.map_to_world_numpy(self.free_cells_xy)
+        distances = np.linalg.norm(free_world - np.asarray(start_world)[:2], axis=-1)
+        valid = np.flatnonzero((distances >= min_distance) & (distances <= max_distance))
+        if valid.size == 0:
+            valid = np.flatnonzero(distances >= min_distance)
+        if valid.size == 0:
+            valid = np.arange(free_world.shape[0])
+        return free_world[int(rng.choice(valid))]
 
 
+def load_map(
+    image_path: str | Path,
+    yaml_path: str | Path,
+    *,
+    scale: float = 0.25,
+    dilation_size: int = 4,
+) -> MapInfo:
+    """Load an occupancy map, optionally downsampling before planning."""
+    if scale <= 0:
+        raise ValueError(f"Map scale must be positive, got {scale}.")
 
-'''
-# Example usage:
-# Assuming the center coordinates (x, y) are provided and valid
-center_x, center_y = 500, 500  # example coordinates in pixels
-pixel_extent = int(90*5)  # 90 meters converted to pixels
-scale_factor = 4/12
-img_path = './datasets/new_maps/warehouse/map.png'
-dilated_img, binary_img = load_image(img_path, scale=scale_factor)
+    with Path(yaml_path).open("r", encoding="utf-8") as stream:
+        metadata = yaml.safe_load(stream)
 
+    image = Image.open(image_path).convert("L").transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+    if scale != 1.0:
+        size = tuple(max(1, round(dim * scale)) for dim in image.size)
+        image = image.resize(size, resample=Image.Resampling.NEAREST)
 
-height_m, width_m  = (90.0, 90.0)
-resolution = 12*scale_factor
-height_px, width_px = round(height_m * resolution), round(width_m * resolution)
-# Transformation from world coordinates [m] to map coordinates [px]
-map_from_world: np.ndarray = np.array(
-    [[resolution, 0.0, resolution * (width_m / 2.0)],
-    [0.0, resolution, resolution * (height_m / 2.0)],
-    [0.0, 0.0, 1.0]]
-)
+    pixels = np.asarray(image)
+    raw = (pixels < int(metadata.get("occupied_thresh", 0.65) * 255)).astype(np.uint8)
+    if dilation_size > 1:
+        structure = np.ones((dilation_size, dilation_size), dtype=bool)
+        occupancy = ndimage.binary_dilation(raw, structure=structure).astype(np.uint8)
+    else:
+        occupancy = raw.copy()
 
-plt.plot(resolution * (width_m / 2.0), resolution * (height_m / 2.0), 'x')
-
-time = 11
-trackTime = np.arange(0, time, 0.1)
-
-map_pos = []
-map_vel = []
-
-start = (3, 9, 1)
-start_map = map_from_world@np.array(start)
-start_map = tuple(start_map[:2].astype(int).tolist())
-goal_map = (start_map[0] - 40, start_map[1] - 30,)
-print(start_map, goal_map)
-
-path = get_dijkstra_path(dilated_img, binary_img, start_map, goal_map, False)
-
-vel = 3
-map_pos.append(path[:vel*time*10:vel])
-
-start = (170, 230)
-goal = (0, 0, 1)
-goal_map = map_from_world@np.array(goal)
-goal_map = tuple(goal_map[:2].astype(int).tolist())
-
-path1 = get_dijkstra_path(dilated_img, binary_img, start, goal_map, True)
-vel = 2
-map_pos.append(path1[:vel*time*10:vel])
+    return MapInfo(
+        occupancy=occupancy,
+        raw_occupancy=raw,
+        resolution=float(metadata["resolution"]) / scale,
+        origin=np.asarray(metadata["origin"], dtype=np.float32),
+    )
 
 
-trackPos = []
-
-for i in range(2):
-    column_of_ones = np.ones((map_pos[i].shape[0], 1))
-    expanded_pos = np.hstack((map_pos[i], column_of_ones))
-    gpos = np.linalg.inv(map_from_world) @ expanded_pos.T
-    trackPos.append(gpos[:2, :].T)
-
-trackPos = np.array(trackPos)
-
-trackVel = trackPos[:, 1:, :] - trackPos[:, :-1, :]
-trackVel = trackVel*10
-
-trackPos = trackPos[:,:-1,:]
-
-rad = np.array([0.4,0.4])
-print(trackPos.shape, trackVel.shape)
-sim_data = {
-    'trackTime':trackTime[:-1], 'trackPos':trackPos, 'trackVel':trackVel, "radius":rad
-    }
-np.savez('./datasets/new_maps/sim.npz', **sim_data)
+def transform_map_to_world(positions: torch.Tensor, map_info: MapInfo) -> torch.Tensor:
+    origin = positions.new_tensor(map_info.origin[:2])
+    return positions.to(dtype=torch.float32) * map_info.resolution + origin
 
 
-
-# height_m, width_m  = (90.0, 90.0)
-# resolution = 12
-# height_px, width_px = round(height_m * resolution), round(width_m * resolution)
-# # Transformation from world coordinates [m] to map coordinates [px]
-# map_from_world: np.ndarray = np.array(
-#         [[resolution, 0.0, resolution * (width_m / 2.0)],
-#         [0.0, resolution, resolution * (height_m / 2.0)],
-#         [0.0, 0.0, 1.0]]
-# )
-'''
-
-# def get_map_mask(map_data, layer_name, map_from_world, canvas_size):
-#     '''
-#     Rasterizes an ORCA sim map.
-#     - obstacles: ORCA map data (list of obstacle polygons)
-#     - layer_name: one of ["walkable", "obstacles"] supported.
-#     - map_from_world: 3x3 transformation matrix from world coordinates [m] to map coordinates [px]
-#     - canvas_size tuple: (H, W) pixels tuple which determines the rasterized image size
-#     '''
-#     init_val = 1 if layer_name == "walkable" else 0
-#     map_mask = np.ones(canvas_size, np.uint8) * init_val
-#     for obstacles in map_data:
-#         cur_obs = np.array(obstacles)
-#         # convert to pixel coords
-#         poly_pts = np.concatenate([cur_obs, np.ones((cur_obs.shape[0], 1))], axis=1)
-#         poly_pts = map_from_world @ poly_pts.T
-#         poly_pts = poly_pts[:-1, :].T
-#         # draw polygon
-#         coords = poly_pts.round().astype(np.int32)
-#         cv2.fillPoly(map_mask, [coords], 0 if layer_name == "walkable" else 1)
-
-#     return map_mask
-
-# import pickle
-# map_path = './datasets/orca_sim/maps/scene_000000/map.pkl'
-# with open(map_path, "rb") as mapf:
-#     map_obj = pickle.load(mapf)
-
-# map_mask = get_map_mask(map_obj, 'walkable', map_from_world, [height_px, width_px])
-# img = cv2.resize(map_mask, (0, 0), fx=1/12, fy=1/12, interpolation=cv2.INTER_NEAREST)
-
-# sim_path = './datasets/orca_sim/maps/scene_000000/sim.npz'
-# sim_data = np.load(sim_path)
-# sim_dict = {
-#     "ts" : sim_data["trackTime"],
-#     "pos" : sim_data["trackPos"],
-#     "vel" : sim_data["trackVel"],
-#     "radius" : sim_data["radius"].reshape((-1,)),
-# }
+def transform_world_to_map(positions: torch.Tensor, map_info: MapInfo) -> torch.Tensor:
+    origin = positions.new_tensor(map_info.origin[:2])
+    return torch.round((positions[..., :2] - origin) / map_info.resolution).to(torch.long)
 
 
-# # ag = sim_dict['pos'][1]
-# # ones_column = np.ones((ag.shape[0], 1))
-
-# # trackPos = np.dot(np.hstack((ag,ones_column)) , map_from_world)
-# plt.imshow(img, origin='lower')
-# ag0 = sim_dict['pos'][0]
-# ag0_vel = sim_dict['vel'][0]
-# ag0_head = np.arctan2(ag0_vel[31,1], ag0_vel[31,0])
-# trans_mean = ag0[31,0:2]
-# trans_rotmat: np.ndarray = np.array(
-#                 [
-#                     [np.cos(ag0_head), -np.sin(ag0_head)],
-#                     [np.sin(ag0_head), np.cos(ag0_head)],
-#                 ]
-#             )
-# print(trans_rotmat, trans_mean)
-# plt.figure()
-# ag1 = sim_dict['pos'][1][:31, 0:2]
-# ag1ag0 = (ag1-trans_mean)@trans_rotmat
-# plt.plot(ag1ag0[:,0], ag1ag0[:,1])
+def random_spawn(map_info: MapInfo, num_agents: int, *, device: torch.device | str = "cpu"):
+    rng = np.random.default_rng()
+    map_positions = torch.as_tensor(map_info.sample_free_cells(num_agents, rng), device=device)
+    return map_positions.long(), transform_map_to_world(map_positions, map_info)
 
 
-# # for ag in range(2):#sim_dict['pos'].shape[0]
-# #     ag_org = sim_dict['pos'][ag] + np.array([45, 45])
-# #     # ag_ext = np.hstack((ag_org, np.ones((ag_org.shape[0], 1))))
-# #     # ag_map = np.dot(map_from_world, ag_ext.T).T
-# #     plt.plot(ag_org[31:,0], ag_org[31:,1])
-# #     # frame31 = ag_org[31]-  np.array([45, 45])
-# #     # frame30 =ag_org[30]-  np.array([45, 45])
-# #     # vel = sim_dict['vel'][ag][31]
-# #     # print(frame31, frame30+ vel*0.1, frame30)
-
-# plt.show()    
+def publish_random_goal(
+    start_points: torch.Tensor,
+    map_info: MapInfo,
+    min_length: float,
+    max_length: float,
+):
+    rng = np.random.default_rng()
+    starts = start_points.detach().cpu().numpy()
+    goals_world = np.stack(
+        [map_info.sample_goal(start, min_length, max_length, rng) for start in starts]
+    )
+    world = torch.as_tensor(goals_world, device=start_points.device, dtype=start_points.dtype)
+    return transform_world_to_map(world, map_info), world

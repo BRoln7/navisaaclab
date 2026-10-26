@@ -1,51 +1,21 @@
-# config.yaml
-
-# pacer
-# training:
-#   train: False
-#   # checkpoint: null
-#   checkpoint: 'logs/sb3/Isaac-Pacer/pacer1.80/model_360448000_steps.zip'
-#   lr: !!float 2e-5
-#   disc_coef: 5
-#   bound_loss: 10
-#   # data_file: 'motion_cap/amass_isaac_run_upright_slim.pkl'
-#   data_file: 'motion_cap/amass_isaac_standing_upright_slim.pkl'
-#   # data_file: 'motion_cap/amass_walk_run_isaac.pkl'
-
-# env:
-#   num_envs: 6
-#   num_robots: 10 # there is a bug for config init, this is not useful for pacer-task
-#   task: Isaac-Pacer
-#   log_name: pacer4.00
-#   traj_speed: 1.80
-#   amp_dt: !!float 0.03333333333333 # 1 / 30
-#   fixed_pose: True
-
-# crowdnav
+# Default public navigation example. Use cadrl_scene35.yaml for scene 35.
 training:
-  train: False
-  # checkpoint: null
-  checkpoint: 'data/checkpoints/cadrl_policy.zip'
-  data_file: 'motion_cap/amass_isaac_standing_upright_slim.pkl'
+  train: false
+  checkpoint: null
+
 env:
-  num_envs: 16 # don't forget to changeg in event_base num_envs = 16
-  num_robots: 16
-  traj_speed: 1.80
-  task: Isaac-Crowdnav
+  task: Isaac-Cadrl-Scene27
   method: Cadrl
-  log_name: Cadrl-16-32
-  fixed_pose: True
-
-# 1, 16, 32, 64, 128
-
-# drlvo
-# training:
-#   train: False
-#   checkpoint: 'models/drl/drl_pre_train.zip'
-#   data_file: 'motion_cap/amass_isaac_standing_upright_slim.pkl' 
-# env:
-#   num_envs: 12
-#   num_robots: 3
-#   traj_speed: 2.00
-#   task: Isaac-Drlvo
-#   log_name: drlvo
+  num_envs: 16
+  num_robots: 4
+  pedestrian_speed: 0.85
+  pedestrian_speed_variation: 0.15
+  fast_pedestrian_probability: 0.10
+  fast_pedestrian_speed: 1.20
+  fast_pedestrian_speed_variation: 0.15
+  pedestrian_acceleration_max: 2.0
+  pedestrian_turn_rate_max: 2.0
+  map_dilation: 7
+  pedestrian_policy: data/checkpoints/policy.pth
+  debug_vis: true
+  log_name: cadrl-scene27

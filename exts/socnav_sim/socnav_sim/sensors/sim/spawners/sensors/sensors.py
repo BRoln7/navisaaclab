@@ -7,15 +7,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import omni.isaac.core.utils.prims as prim_utils
+import isaacsim.core.utils.prims as prim_utils
 import omni.kit.commands
 import omni.log
 from pxr import Sdf, Usd, Gf
 
 import sys
 
-from omni.isaac.lab.sim.utils import clone
-from omni.isaac.lab.utils import to_camel_case
+from isaaclab.sim.utils import clone
+from isaaclab.utils import to_camel_case
 
 if TYPE_CHECKING:
     from . import sensors_cfg
@@ -151,14 +151,14 @@ def spawn_lidar(
     translation: tuple[float, float, float] | None = None,
     orientation: tuple[float, float, float, float] | None = None,
 ) -> Usd.Prim:
-    
-    if 'omni.isaac.sensor' not in sys.modules:
+
+    if 'isaacsim.sensors.rtx' not in sys.modules:
         try:
-            __import__('omni.isaac.sensor')
+            __import__('isaacsim.sensors.rtx')
         except ImportError as e:
-            print(f"Failed to import omni.isaac.sensor: {e}")
-            
-    assert 'omni.isaac.sensor' in sys.modules, "omni.isaac.sensor has not been imported, can't spawn RtxLidar"
+            print(f"Failed to import isaacsim.sensors.rtx: {e}")
+
+    assert 'isaacsim.sensors.rtx' in sys.modules, "isaacsim.sensors.rtx has not been imported, can't spawn RtxLidar"
 
     _, sensor = omni.kit.commands.execute(
         "IsaacSensorCreateRtxLidar",

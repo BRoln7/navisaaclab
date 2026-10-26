@@ -7,14 +7,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import omni.isaac.core.utils.prims as prim_utils
-import omni.isaac.core.utils.stage as stage_utils
+import isaacsim.core.utils.prims as prim_utils
+import isaacsim.core.utils.stage as stage_utils
 import omni.kit.commands
 import omni.log
 from pxr import Gf, Sdf, Usd
 
-from omni.isaac.lab.sim import converters, schemas
-from omni.isaac.lab.sim.utils import bind_physics_material, bind_visual_material, clone, select_usd_variants
+from isaaclab.sim import converters, schemas
+from isaaclab.sim.utils import bind_physics_material, bind_visual_material, clone, select_usd_variants
 
 if TYPE_CHECKING:
     from . import from_files_cfg

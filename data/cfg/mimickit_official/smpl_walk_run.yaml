@@ -1,0 +1,5 @@
+motions:
+  - file: "../../data/mimickit/official_smpl/smpl_walk.pkl"
+    weight: 1.0
+  - file: "../../data/mimickit/official_smpl/smpl_run.pkl"
+    weight: 1.0

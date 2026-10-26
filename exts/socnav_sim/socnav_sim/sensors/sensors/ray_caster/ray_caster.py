@@ -15,18 +15,18 @@ import carb
 import omni.log
 import omni.physics.tensors.impl.api as physx
 import warp as wp
-from omni.isaac.core.prims import XFormPrimView
+from isaacsim.core.prims import XFormPrim
 from pxr import UsdGeom, UsdPhysics
 
-import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.markers import VisualizationMarkers
-from omni.isaac.lab.terrains.trimesh.utils import make_plane
-from omni.isaac.lab.utils.math import convert_quat, quat_apply, quat_apply_yaw
-from omni.isaac.lab.utils.warp import convert_to_warp_mesh, raycast_mesh
+import isaaclab.sim as sim_utils
+from isaaclab.markers import VisualizationMarkers
+from isaaclab.terrains.trimesh.utils import make_plane
+from isaaclab.utils.math import convert_quat, quat_apply, quat_apply_yaw
+from isaaclab.utils.warp import convert_to_warp_mesh, raycast_mesh
 
 import omni.replicator.core as rep
 
-from omni.isaac.lab.sensors.sensor_base import SensorBase
+from isaaclab.sensors.sensor_base import SensorBase
 from .ray_caster_data import RayCasterData, RTXRayCasterData, RTXRayCasterInfo
 
 
@@ -146,9 +146,9 @@ class RayCaster(SensorBase):
             self._view = self._physics_sim_view.create_rigid_body_view(self.cfg.prim_path.replace(".*", "*"))
             found_supported_prim_class = True
         else:
-            self._view = XFormPrimView(self.cfg.prim_path, reset_xform_properties=False)
+            self._view = XFormPrim(self.cfg.prim_path, reset_xform_properties=False)
             found_supported_prim_class = True
-            omni.log.warn(f"The prim at path {prim.GetPath().pathString} is not a physics prim! Using XFormPrimView.")
+            omni.log.warn(f"The prim at path {prim.GetPath().pathString} is not a physics prim! Using XFormPrim.")
         # check if prim view class is found
         if not found_supported_prim_class:
             raise RuntimeError(f"Failed to find a valid prim view class for the prim paths: {self.cfg.prim_path}")
@@ -231,7 +231,7 @@ class RayCaster(SensorBase):
     def _update_buffers_impl(self, env_ids: Sequence[int]):
         """Fills the buffers of the sensor data."""
         # obtain the poses of the sensors
-        if isinstance(self._view, XFormPrimView):
+        if isinstance(self._view, XFormPrim):
             pos_w, quat_w = self._view.get_world_poses(env_ids)
         elif isinstance(self._view, physx.ArticulationView):
             pos_w, quat_w = self._view.get_root_transforms()[env_ids].split([3, 4], dim=-1)
@@ -381,7 +381,13 @@ class RTXRayCaster(SensorBase):
             render_prod_path = rep.create.render_product(lidar_prim, [1, 1])
             self._render_product_paths.append(render_prod_path)
             # create annotator node
-            rep_annotator = rep.AnnotatorRegistry.get_annotator("RtxSensorCpuIsaacCreateRTXLidarScanBuffer", do_array_copy=False)
+            rep_annotator = rep.AnnotatorRegistry.get_annotator("IsaacCreateRTXLidarScanBuffer", do_array_copy=False)
+            rep_annotator.initialize(
+                outputIntensity=True, outputDistance=True, outputObjectId=True,
+                outputVelocity=True, outputAzimuth=True, outputElevation=True,
+                outputNormal=True, outputTimestamp=True, outputEmitterId=True,
+                outputBeamId=True, outputMaterialId=True,
+            )
             rep_annotator.attach(render_prod_path)
             # Debug draw
             # self.writer = rep.writers.get("RtxLidarDebugDrawPointCloudBuffer")

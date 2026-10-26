@@ -1,163 +1,250 @@
-import torch
-import numpy as np
+"""CPU path planning utilities for the CADRL examples."""
+
+from __future__ import annotations
+
 import heapq
-import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
-from matplotlib import cm
+import math
 
-# define 8 direction for searching
-DIRECTIONS = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, -1), (-1, 1), (1, 1)]
+import numpy as np
+import torch
 
-def get_dijkstra_cost(grid, start, goal):
-    rows, cols = grid.shape
-    distance = np.full(grid.shape, np.inf)
-    distance[start] = 0
-    pq = [(0, start)]
-    parent = np.full((rows, cols, 2), -1)
 
-    while pq:
-        current_dist, current_node = heapq.heappop(pq)
-        current_dist = current_dist - np.sqrt((current_node[0]-goal[0])**2+(current_node[1]-goal[1])**2)
-        
-        if current_node == goal:
+_NEIGHBORS = (
+    (-1, 0, 1.0), (1, 0, 1.0), (0, -1, 1.0), (0, 1, 1.0),
+    (-1, -1, math.sqrt(2.0)), (-1, 1, math.sqrt(2.0)),
+    (1, -1, math.sqrt(2.0)), (1, 1, math.sqrt(2.0)),
+)
+
+
+def astar_path(occupancy: np.ndarray, start_xy, goal_xy) -> np.ndarray | None:
+    """Return an ``[L, 2]`` x/y grid path, or ``None`` when unreachable."""
+    start = tuple(np.asarray(start_xy, dtype=np.int64).tolist())
+    goal = tuple(np.asarray(goal_xy, dtype=np.int64).tolist())
+    rows, cols = occupancy.shape
+
+    def free(node: tuple[int, int]) -> bool:
+        x, y = node
+        return 0 <= x < cols and 0 <= y < rows and occupancy[y, x] == 0
+
+    if not free(start) or not free(goal):
+        return None
+    if start == goal:
+        return np.asarray([start], dtype=np.float32)
+
+    queue = [(0.0, 0.0, start)]
+    parent: dict[tuple[int, int], tuple[int, int]] = {}
+    cost = {start: 0.0}
+    closed: set[tuple[int, int]] = set()
+
+    while queue:
+        _, current_cost, current = heapq.heappop(queue)
+        if current in closed:
+            continue
+        if current == goal:
+            path = [current]
+            while current != start:
+                current = parent[current]
+                path.append(current)
+            path.reverse()
+            return np.asarray(path, dtype=np.float32)
+        closed.add(current)
+
+        cx, cy = current
+        for dx, dy, step_cost in _NEIGHBORS:
+            neighbor = (cx + dx, cy + dy)
+            if not free(neighbor):
+                continue
+            # Prevent diagonal paths from cutting through obstacle corners.
+            if dx and dy and (not free((cx + dx, cy)) or not free((cx, cy + dy))):
+                continue
+            new_cost = current_cost + step_cost
+            if new_cost >= cost.get(neighbor, math.inf):
+                continue
+            cost[neighbor] = new_cost
+            parent[neighbor] = current
+            heuristic = math.hypot(neighbor[0] - goal[0], neighbor[1] - goal[1])
+            heapq.heappush(queue, (new_cost + heuristic, new_cost, neighbor))
+    return None
+
+
+def _segment_is_free(occupancy: np.ndarray, start_xy: np.ndarray, end_xy: np.ndarray) -> bool:
+    """Check every grid cell touched by a continuous segment."""
+    # Grid points denote cell centers, so shifting by half a cell lets the
+    # standard voxel traversal operate on integer cell boundaries.
+    start = np.asarray(start_xy, dtype=np.float64) + 0.5
+    end = np.asarray(end_xy, dtype=np.float64) + 0.5
+    delta = end - start
+    cell = np.floor(start).astype(np.int64)
+    final = np.floor(end).astype(np.int64)
+    step = np.sign(delta).astype(np.int64)
+    inverse = np.full(2, np.inf, dtype=np.float64)
+    moving = np.abs(delta) > 1e-12
+    inverse[moving] = 1.0 / np.abs(delta[moving])
+    boundary = np.where(step > 0, cell + 1.0, cell.astype(np.float64))
+    maximum = np.full(2, np.inf, dtype=np.float64)
+    maximum[moving] = np.abs(boundary[moving] - start[moving]) * inverse[moving]
+
+    rows, cols = occupancy.shape
+
+    def free(candidate: np.ndarray) -> bool:
+        x, y = candidate.tolist()
+        return 0 <= x < cols and 0 <= y < rows and occupancy[y, x] == 0
+
+    if not free(cell):
+        return False
+    while not np.array_equal(cell, final):
+        if maximum[0] < maximum[1]:
+            cell[0] += step[0]
+            maximum[0] += inverse[0]
+        elif maximum[1] < maximum[0]:
+            cell[1] += step[1]
+            maximum[1] += inverse[1]
+        else:
+            # A corner crossing touches both side cells as well as the
+            # diagonal one; rejecting occupied side cells prevents clipping.
+            side_x = cell + np.array((step[0], 0), dtype=np.int64)
+            side_y = cell + np.array((0, step[1]), dtype=np.int64)
+            if not free(side_x) or not free(side_y):
+                return False
+            cell += step
+            maximum += inverse
+        if not free(cell):
+            return False
+    return True
+
+
+def simplify_grid_path(path: np.ndarray, occupancy: np.ndarray) -> np.ndarray:
+    """Remove A* stair steps while retaining collision-free line segments."""
+    points = np.asarray(path, dtype=np.float32)
+    if points.shape[0] <= 2:
+        return points.copy()
+    simplified = [points[0]]
+    anchor = 0
+    while anchor < points.shape[0] - 1:
+        candidate = points.shape[0] - 1
+        while candidate > anchor + 1:
+            if _segment_is_free(occupancy, points[anchor], points[candidate]):
+                break
+            candidate -= 1
+        simplified.append(points[candidate])
+        anchor = candidate
+    return np.asarray(simplified, dtype=np.float32)
+
+
+def smooth_grid_path(path: np.ndarray, occupancy: np.ndarray, iterations: int = 2) -> np.ndarray:
+    """Round polyline corners with collision-checked Chaikin subdivisions."""
+    current = simplify_grid_path(path, occupancy)
+    for _ in range(max(0, iterations)):
+        if current.shape[0] <= 2:
             break
-        
-        for direction in DIRECTIONS:
-            neighbor = (current_node[0] + direction[0], current_node[1] + direction[1])
-            
-            if 0 <= neighbor[0] < rows and 0 <= neighbor[1] < cols and grid[neighbor] == 0:
-                weight = 1 if direction[0] == 0 or direction[1] == 0 else np.sqrt(2)
-                distance_through_current = current_dist + weight + np.sqrt((neighbor[0]-goal[0])**2+(neighbor[1]-goal[1])**2)
-                
-                if distance_through_current < distance[neighbor]:
-                    distance[neighbor] = distance_through_current
-                    parent[neighbor] = current_node
-                    heapq.heappush(pq, (distance_through_current, neighbor))
-
-    return distance, parent
-
-def reconstruct_path(parent, start, goal):
-    path = []
-    x, y = goal
-    while parent[x, y][0] != -1:
-        path.append((x, y))
-        x, y = parent[x, y]
-    path.append(start)
-    path.reverse()
-    return np.array(path)
-
-def calculate_curvature(path):
-    x = path[:, 0]
-    y = path[:, 1]
-
-    # (x3 - x1)*(y2 - y1) - (y3 - y1)*(x2 - x1)
-    dx1 = x[2:] - x[:-2]  # x3 - x1
-    dy1 = y[2:] - y[:-2]  # y3 - y1
-    dx2 = x[1:-1] - x[:-2]  # x2 - x1
-    dy2 = y[1:-1] - y[:-2]  # y2 - y1
-
-    area = np.abs(dx1 * dy2 - dy1 * dx2)
-
-    # (x2 - x1)^2 + (y2 - y1)^2
-    length_sq = (dx2 ** 2 + dy2 ** 2) ** 1.5
-
-    curvatures = np.divide(2 * area, length_sq, where=length_sq != 0)
-
-    return curvatures
-
-def select_control_points(path, curvature_threshold=0.2):
-    curvatures = calculate_curvature(path)
-    control_points = [path[0]]
-    j = 0 
-    for i, curv in enumerate(curvatures):
-        if curv > curvature_threshold:
-            control_points.append(path[i + 1])
-            j = 0
-        else:
-            j += 1
-            if j > 6:
-                control_points.append(path[i])
-                j = 0
-    control_points.append(path[-1])
-    return np.array(control_points)
+        candidate = [current[0]]
+        for start, end in zip(current[:-1], current[1:]):
+            candidate.extend((0.75 * start + 0.25 * end, 0.25 * start + 0.75 * end))
+        candidate.append(current[-1])
+        candidate = np.asarray(candidate, dtype=np.float32)
+        if not all(
+            _segment_is_free(occupancy, start, end)
+            for start, end in zip(candidate[:-1], candidate[1:])
+        ):
+            break
+        current = candidate
+    return current
 
 
-from scipy.interpolate import splprep, splev
-
-def smooth_with_b_spline(control_points, num):
-
-    k = 3
-    if control_points.shape[0] <= 3:
-        k = control_points.shape[0] - 1
-
-    tck, u = splprep(control_points.T, s=0, k=k)
-    x = np.linspace(0, 1, num)
-    new_points = splev(x, tck)
-    return np.array(new_points).T
-
-def visualize_cost_and_path(grid, distance, start, goal, path=None):
-    color_map = np.zeros((grid.shape[0], grid.shape[1], 3), dtype=np.float32)
-
-    color_map[grid == 1] = [0, 0, 0]
-
-    color_map[(grid == 0)] = [0.6, 0.6, 0.6]
-
-    finite_mask = np.isfinite(distance)
-    if finite_mask.any():
-        norm = Normalize(vmin=np.min(distance[finite_mask]), vmax=np.max(distance[finite_mask]))
-        cmap = cm.get_cmap('viridis')
-        color_map[finite_mask] = cmap(norm(distance[finite_mask]))[:, :3] # type: ignore
-
-    color_map[start] = [0, 1, 0]
-    color_map[goal] = [1, 0, 0]
-
-    plt.imshow(color_map, origin='lower')
-    # plt.show()
+def resample_polyline(points: np.ndarray, spacing: float) -> np.ndarray:
+    """Resample a polyline at approximately uniform metric spacing."""
+    points = np.asarray(points, dtype=np.float32)
+    if points.shape[0] <= 1:
+        return points.copy()
+    segments = np.linalg.norm(np.diff(points, axis=0), axis=-1)
+    cumulative = np.concatenate(([0.0], np.cumsum(segments)))
+    length = float(cumulative[-1])
+    if length <= 1e-6:
+        return points[:1].copy()
+    distances = np.arange(0.0, length, spacing, dtype=np.float32)
+    if distances.size == 0 or distances[-1] < length:
+        distances = np.append(distances, length)
+    return np.column_stack(
+        [np.interp(distances, cumulative, points[:, axis]) for axis in range(2)]
+    ).astype(np.float32)
 
 
-def get_dijkstra_path(grid, img, start, goal, viz=False, traj_optim=False):
-    '''
-        grid: ndarray binary map for planning
-        img: ndarray origin figure for visualization
-        start: tuple
-        goal: tuple 
-        viz: bool flag for visiualization
-        traj_optim: bool flag for b_spline trajctory optimization  
-        
-        return: trajectory
-    '''
-    start = start[::-1]
-    goal = goal[::-1]
-    distance, parents= get_dijkstra_cost(grid, start, goal)
+def time_parameterize_path(
+    points: np.ndarray,
+    cruise_speed: float,
+    *,
+    acceleration_max: float = 2.0,
+    turn_rate_max: float = 2.0,
+    minimum_speed: float = 0.10,
+) -> np.ndarray:
+    """Compute arrival times with PACER-compatible acceleration/turn limits.
 
-    if distance[goal] != float('inf'):
-        path = reconstruct_path(parents, start, goal)
-        # visualize_cost_and_path(img, distance, start, goal, path)
-        if traj_optim:
-            control_points = select_control_points(path)
-            smoothed_path = smooth_with_b_spline(control_points, 10*path.shape[0])
-            # print('*** Found b-spline path with: ', smoothed_path.shape)
-        else:
-            smoothed_path = path
+    The geometry remains on the collision-checked map path. Speed is reduced
+    before corners, then recovered with a forward/backward acceleration pass.
+    """
+    points = np.asarray(points, dtype=np.float32)
+    if points.shape[0] <= 1:
+        return np.zeros(points.shape[0], dtype=np.float32)
+    if cruise_speed <= 0 or acceleration_max <= 0 or turn_rate_max <= 0:
+        raise ValueError("Trajectory speed, acceleration and turn-rate limits must be positive")
 
-        if viz:
-            visualize_cost_and_path(img, distance, start, goal, path)
-            plt.plot(start[1], start[0],'rx')
-            plt.plot(goal[1], goal[0], 'bx')
-            plt.plot( path[:, 1], path[:, 0], color='b')
-            plt.plot( smoothed_path[:, 1], smoothed_path[:, 0], linestyle='--', color='r')
-            plt.scatter(control_points[:,1], control_points[:,0], color='g')
-            plt.show()
-        return smoothed_path[:, ::-1]
-    else:
-        print("No path found from start to goal.")
-        if viz:
-            visualize_cost_and_path(img, distance, start, goal)
+    displacement = np.diff(points, axis=0)
+    segment_length = np.linalg.norm(displacement, axis=-1)
+    segment_length = np.maximum(segment_length, 1e-6)
+    heading = np.arctan2(displacement[:, 1], displacement[:, 0])
+    turn = np.abs((np.diff(heading) + np.pi) % (2.0 * np.pi) - np.pi)
+    local_distance = 0.5 * (segment_length[:-1] + segment_length[1:])
+    curvature = turn / np.maximum(local_distance, 1e-6)
 
-def path_align_length(_path:np.array, traj_length:int)->torch.tensor:
+    speed = np.full(points.shape[0], float(cruise_speed), dtype=np.float64)
+    if curvature.size:
+        corner_limit = turn_rate_max / np.maximum(curvature, 1e-6)
+        speed[1:-1] = np.minimum(speed[1:-1], corner_limit)
+    speed = np.maximum(speed, min(float(minimum_speed), float(cruise_speed)))
 
-    path = torch.cat([torch.tensor(_path.copy(), device='cuda:0'),
-                      torch.ones((traj_length - _path.shape[0]), 2, device='cuda:0') *\
-                      torch.tensor(_path[-1].copy(), device='cuda:0')], dim=0)
-    
-    return path
+    # Enforce |dv/dt| <= acceleration_max in both travel directions.
+    for index, distance in enumerate(segment_length, start=1):
+        reachable = math.sqrt(speed[index - 1] ** 2 + 2.0 * acceleration_max * distance)
+        speed[index] = min(speed[index], reachable)
+    for index in range(points.shape[0] - 2, -1, -1):
+        reachable = math.sqrt(speed[index + 1] ** 2 + 2.0 * acceleration_max * segment_length[index])
+        speed[index] = min(speed[index], reachable)
+
+    segment_dt = 2.0 * segment_length / np.maximum(speed[:-1] + speed[1:], 1e-6)
+    return np.concatenate(([0.0], np.cumsum(segment_dt))).astype(np.float32)
+
+
+def pad_paths(paths: list[np.ndarray], *, device: torch.device | str) -> tuple[torch.Tensor, torch.Tensor]:
+    if not paths:
+        return torch.empty((0, 1, 2), device=device), torch.empty((0,), dtype=torch.long, device=device)
+    lengths = torch.tensor([len(path) for path in paths], dtype=torch.long, device=device)
+    padded = torch.empty((len(paths), int(lengths.max().item()), 2), dtype=torch.float32, device=device)
+    for index, path in enumerate(paths):
+        tensor = torch.as_tensor(path, dtype=torch.float32, device=device)
+        padded[index] = tensor[-1]
+        padded[index, : tensor.shape[0]] = tensor
+    return padded, lengths
+
+
+def sample_paths(paths: torch.Tensor, lengths: torch.Tensor, indices: torch.Tensor) -> torch.Tensor:
+    """Sample each padded path at integer indices shaped ``[N]`` or ``[N, K]``."""
+    if indices.ndim == 1:
+        clamped = torch.minimum(indices, lengths - 1)
+        return paths[torch.arange(paths.shape[0], device=paths.device), clamped]
+    clamped = torch.minimum(indices, (lengths - 1).unsqueeze(-1))
+    rows = torch.arange(paths.shape[0], device=paths.device).unsqueeze(-1).expand_as(clamped)
+    return paths[rows, clamped]
+
+
+# Compatibility wrapper for tools that used the former function name.
+def get_dijkstra_path(grid, _image, start, goal, viz=False, traj_optim=False):
+    del viz, traj_optim
+    return astar_path(grid, start, goal)
+
+
+def path_align_length(path: np.ndarray, trajectory_length: int, *, device="cpu") -> torch.Tensor:
+    tensor = torch.as_tensor(path, dtype=torch.float32, device=device)
+    if tensor.shape[0] >= trajectory_length:
+        return tensor[:trajectory_length]
+    padding = tensor[-1].expand(trajectory_length - tensor.shape[0], -1)
+    return torch.cat((tensor, padding), dim=0)

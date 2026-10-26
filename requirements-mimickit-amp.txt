@@ -1,0 +1,14 @@
+# Simulator/Torch come from the existing navisaaclab environment.
+# MimicKit source is pinned in third_party/mimickit.lock.json.
+gymnasium
+numpy
+scipy
+joblib
+PyYAML
+tensorboardX
+tensorboard
+moviepy
+imageio-ffmpeg
+Pillow
+# Upstream imports this logger eagerly; the integration uses TensorBoard only.
+wandb

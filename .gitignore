@@ -1,0 +1,29 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+logs/
+.venv/
+.vscode/
+.aws/
+# Local simulator checkout; install Isaac Lab separately using its official setup.
+/IsaacLab/
+# Locally provided datasets and simulator assets.
+data/motion_cap/
+data/amass_raw/
+data/smpl/
+data/usd/
+data/usd_assets/
+data/checkpoints/
+# Local data bundles are hosted on Hugging Face, not in the code repository.
+/data/*.zip
+/data/*.7z
+/data/*.tar
+/data/*.tar.gz
+/data/*.tgz
+
+# Reproducible upstream checkout and generated motion conversions.
+third_party/MimicKit/
+data/mimickit/

@@ -1,0 +1,23 @@
+{
+  "repository": "https://github.com/nv-tlabs/pacer",
+  "upstream_reference_revision": "baeb6241f03fc9d78370a64e3c2dcef9d830d97f",
+  "notice": "Adapted function subset from local PACER-derived copies, cross-checked with upstream; not byte-identical upstream snapshots.",
+  "upstream_paths": {
+    "process_amass_raw.py": "uhc/data_process/process_amass_raw.py",
+    "process_amass_db.py": "uhc/data_process/process_amass_db.py",
+    "convert_amass_isaac.py": "uhc/data_process/convert_amass_isaac.py"
+  },
+  "local_source_sha256": {
+    "process_amass_raw.py": "1bec275b408a5125b2401082c0b9dcc1a72cdb97aeb344f64b1aaeef036b1cda",
+    "process_amass_db.py": "b5f35293909a230de0748f0317c798969b017ff5c2e93d7006fb5566de9d7e05",
+    "convert_amass_isaac.py": "d37a79bac210f95299502a0102cadf7f7ac6fc70813497d200be498e099196d9"
+  },
+  "adapted_sha256": {
+    "process_amass_raw.py": "5a241b526bbdf95e94a53bc264679b8905377c135f29b7d2d5ef8c0d5f1efb4c",
+    "process_amass_db.py": "19332392eade1a62213a1580af8b213fba0d999051e1b42ce83ed3cd024d66ea",
+    "convert_amass_isaac.py": "2bdf7010be5d9ac05ca635181e51bc2e3b09f8552dcdb967aaae1fa88c160330"
+  },
+  "published_occlusion_file_id": "1rUSjVUYE8bIPZOyhbdQrKZ9-otE3fHpr",
+  "published_occlusion_version": "v2",
+  "upstream_process_default_occlusion_version": "v3"
+}

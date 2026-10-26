@@ -7,11 +7,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import omni.isaac.core.utils.prims as prim_utils
+import isaacsim.core.utils.prims as prim_utils
 from pxr import Usd
 
-from omni.isaac.lab.sim import schemas
-from omni.isaac.lab.sim.utils import bind_physics_material, bind_visual_material, clone
+from isaaclab.sim import schemas
+from isaaclab.sim.utils import bind_physics_material, bind_visual_material, clone
 
 if TYPE_CHECKING:
     from . import shapes_cfg

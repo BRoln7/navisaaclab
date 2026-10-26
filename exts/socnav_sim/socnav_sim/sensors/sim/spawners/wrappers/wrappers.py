@@ -10,12 +10,12 @@ import re
 from typing import TYPE_CHECKING
 
 import carb
-import omni.isaac.core.utils.prims as prim_utils
-import omni.isaac.core.utils.stage as stage_utils
+import isaacsim.core.utils.prims as prim_utils
+import isaacsim.core.utils.stage as stage_utils
 from pxr import Sdf, Usd
 
-import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.sim.spawners.from_files import UsdFileCfg
+import isaaclab.sim as sim_utils
+from isaaclab.sim.spawners.from_files import UsdFileCfg
 
 if TYPE_CHECKING:
     from . import wrappers_cfg

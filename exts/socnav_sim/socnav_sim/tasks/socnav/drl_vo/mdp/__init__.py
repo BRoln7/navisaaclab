@@ -1,11 +1,5 @@
-# Copyright (c) 2022-2024, The Isaac Lab Project Developers.
-# All rights reserved.
-#
-# SPDX-License-Identifier: BSD-3-Clause
+"""DRL-VO input encoders; rewards are inherited from the shared CADRL task."""
 
-"""This sub-module contains the functions that are specific to the humanoid environment."""
+from .observations import compute_lidar_obs, compute_peds_obs, compute_subgoal_obs
 
-from omni.isaac.lab.envs.mdp import *  # noqa: F401, F403
-
-from .observations import *
-from .rewards import *
+__all__ = ["compute_lidar_obs", "compute_peds_obs", "compute_subgoal_obs"]

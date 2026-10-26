@@ -31,9 +31,9 @@ When parsing physics material properties on an object, the following priority is
 Usage:
     .. code-block:: python
 
-        import omni.isaac.core.utils.prims as prim_utils
+        import isaacsim.core.utils.prims as prim_utils
 
-        import omni.isaac.lab.sim as sim_utils
+        import isaaclab.sim as sim_utils
 
         # create a visual material
         visual_material_cfg = sim_utils.GlassMdlCfg(glass_ior=1.0, thin_walled=True)

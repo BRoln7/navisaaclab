@@ -1,7 +1,9 @@
 # Reference: https://github.com/DLR-RM/rl-baselines3-zoo/blob/master/hyperparams/ppo.yml#L245
 seed: 0
 
-policy: 'CnnPolicy'
+# The 3x80x80 input and 2D subgoal are flattened into one vector. CustomCNN
+# performs the split; MlpPolicy supports this vector observation space.
+policy: 'MlpPolicy'
 n_timesteps: !!float 5e6
 batch_size: 128
 n_steps: 128

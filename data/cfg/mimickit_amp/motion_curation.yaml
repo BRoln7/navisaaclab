@@ -1,0 +1,33 @@
+# Kinematic selection of ordinary forward walking, not a learned gait labeler.
+source_motion_file: data/mimickit/official_smpl/locomotion/motions.yaml
+output_dir: data/mimickit/official_smpl/locomotion-curated-v1
+group_shares:
+  walking: 0.55
+  running: 0.30
+  jogging: 0.10
+  transition: 0.05
+walking:
+  min_duration_seconds: 2.0
+  speed_min: 0.55
+  speed_max: 1.65
+  smoothing_seconds: 0.5
+  variation_window_seconds: 0.75
+  speed_std_max: 0.35
+  turn_window_seconds: 1.0
+  turn_rate_max: 1.0
+  forward_alignment_min: 0.75
+  upright_min: 0.88
+  max_instant_speed: 3.0
+  excluded_name_fragments:
+    - catwalk
+    - one leg
+    - handrail
+    - beam
+    - thinking
+    - look around
+    - bag
+    - backward
+    - crouch
+    - limp
+    - march
+    - tiptoe

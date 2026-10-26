@@ -1,16 +1,9 @@
-"""Package containing task implementations for various robotic environments."""
+"""Register task metadata without loading simulation configs or task resources.
 
-import os
-import toml
+Isaac Lab resolves string config entry points when the selected task is created.
+Do not recursively import task modules: they may initialize CUDA and load assets.
+"""
 
-from omni.isaac.lab_tasks.utils import import_packages
-
-##
-# Register Gym environments.
-##
-
-
-# The blacklist is used to prevent importing configs from sub-packages
-_BLACKLIST_PKGS = ["utils"]
-# Import all configs in this package
-import_packages(__name__, _BLACKLIST_PKGS)
+from .socnav import cadrl
+from .socnav import drl_vo
+from .socnav import egonav

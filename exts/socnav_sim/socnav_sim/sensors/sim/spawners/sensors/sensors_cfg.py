@@ -9,8 +9,8 @@ from collections.abc import Callable
 from typing import Literal
 from dataclasses import MISSING
 
-from omni.isaac.lab.sim.spawners.spawner_cfg import SpawnerCfg
-from omni.isaac.lab.utils import configclass
+from isaaclab.sim.spawners.spawner_cfg import SpawnerCfg
+from isaaclab.utils import configclass
 
 from . import sensors
 
@@ -268,7 +268,7 @@ class LidarCfg(SpawnerCfg):
     """
     func = sensors.spawn_lidar
     lidar_type: str = "Example_Rotary"
-    class LidarType: 
+    class LidarType:
         '''Class variables for autocompletion'''
         HESAI_PandarXT_32 = "Hesai_XT32_SD10"
         OUSTER_OS0_128_10HZ_1024RES = "OS0_128ch10hz1024res"

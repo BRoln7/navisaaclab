@@ -1,0 +1,34 @@
+env_name: "amp"
+
+char_file: "data/assets/smpl/smpl.xml"
+camera_mode: "track"
+
+episode_length: 10.0 # seconds
+global_obs: True
+root_height_obs: True
+pose_termination: False
+enable_phase_obs: False
+enable_tar_obs: False
+num_disc_obs_steps: 10
+rand_reset: True
+
+ref_char_offset: [2.0, 0.0, 0.0] # m
+init_pose: [0, 0, 0.9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1.5708, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.5708, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+enable_early_termination: True
+key_bodies: ["L_Toe", "R_Toe", "Head", "L_Hand", "R_Hand"]
+contact_bodies: ["L_Ankle", "L_Toe", "R_Ankle", "R_Toe"]
+
+motion_file: "../../data/cfg/mimickit_official/smpl_walk_run.yaml"
+
+reward_pose_w: 0.5
+reward_vel_w: 0.1
+reward_root_pose_w: 0.15
+reward_root_vel_w: 0.1
+reward_key_pos_w: 0.15
+
+reward_pose_scale: 0.25
+reward_vel_scale: 0.01
+reward_root_pose_scale: 5.0
+reward_root_vel_scale: 1.0
+reward_key_pos_scale: 10.0

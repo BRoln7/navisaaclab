@@ -1,17 +1,17 @@
-"""Configuration for a smpl_humanoid robot."""
+"""Jackal differential-drive robot configuration."""
 
-import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.actuators import ImplicitActuatorCfg
-from omni.isaac.lab.assets import ArticulationCfg
-import os
+import isaaclab.sim as sim_utils
+from isaaclab.actuators import ImplicitActuatorCfg
+from isaaclab.assets import ArticulationCfg
 
-wheel_radius = 0.098
-lenght = 0.262
-width = 0.37558
+from socnav_sim.config import PROJECT_ROOT
+
+WHEEL_RADIUS = 0.098
+WHEEL_BASE = 0.37558
 
 JACKAL_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=os.path.join(os.getcwd(), 'data', 'usd', 'robots', 'jackal.usda'),
+        usd_path=str(PROJECT_ROOT / "data/usd/assets/robots/jackal.usda"),
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=None,
             max_depenetration_velocity=10.0,
@@ -27,24 +27,12 @@ JACKAL_CFG = ArticulationCfg(
             solver_velocity_iteration_count=0,
         ),
     ),
-    init_state=ArticulationCfg.InitialStateCfg(
-        pos=(-0., -0.,  0.2),
-        # rot=(-0.7487, -0.0248,  0.0320, -0.6617),
-    ),
+    init_state=ArticulationCfg.InitialStateCfg(pos=(0.0, 0.0, 0.2)),
     actuators={
         "all_joints": ImplicitActuatorCfg(
             joint_names_expr=[".*"],
-            stiffness={
-                "front_left_wheel_joint": 0.,
-                "front_right_wheel_joint": 0.,
-                "rear_left_wheel_joint": 0.,
-                "rear_right_wheel_joint": 0.,
-            },
-            damping={
-                "front_left_wheel_joint": 10000000.,
-                "front_right_wheel_joint": 10000000.,
-                "rear_left_wheel_joint": 10000000.,
-                "rear_right_wheel_joint": 10000000.,
-            },
-   ),}
+            stiffness=0.0,
+            damping=10_000_000.0,
+        ),
+    },
 )

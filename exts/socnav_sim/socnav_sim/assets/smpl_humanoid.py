@@ -1,14 +1,14 @@
 """Configuration for a smpl_humanoid robot."""
 
-import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.actuators import ImplicitActuatorCfg
-from omni.isaac.lab.assets import ArticulationCfg
-import os
+import isaaclab.sim as sim_utils
+from isaaclab.actuators import ImplicitActuatorCfg
+from isaaclab.assets import ArticulationCfg
+from socnav_sim.config import PROJECT_ROOT
 
 SMPL_HUMANOID_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"data/usd/robots/new_human.usd",
-        # usd_path=f"data/usd/robots/smpl_humanoid.usda",
+        # usd_path=f"data/usd/robots/new_human.usd",
+        usd_path=str(PROJECT_ROOT / "data/usd/assets/robots/smpl_humanoid.usda"),
         copy_from_source=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=None,
@@ -67,30 +67,56 @@ SMPL_HUMANOID_CFG = ArticulationCfg(
    ),}
 )
 
+# Navigation uses the same official USD and implicit position drives as the
+# MimicKit environment that trained the exported pedestrian actor.
+MIMICKIT_SMPL_HUMANOID_CFG = ArticulationCfg(
+    spawn=sim_utils.UsdFileCfg(
+        usd_path=str(PROJECT_ROOT / "third_party/MimicKit/data/assets/smpl/smpl.usd"),
+        copy_from_source=True,
+        activate_contact_sensors=True,
+        rigid_props=sim_utils.RigidBodyPropertiesCfg(
+            max_depenetration_velocity=10.0,
+            angular_damping=0.01,
+            max_linear_velocity=1000.0,
+            max_angular_velocity=1000.0,
+        ),
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(
+            enabled_self_collisions=True,
+            fix_root_link=False,
+        ),
+    ),
+    init_state=ArticulationCfg.InitialStateCfg(pos=(0.0, 0.0, 0.9)),
+    actuators={
+        "all_joints": ImplicitActuatorCfg(
+            joint_names_expr=[".*"], stiffness=None, damping=None, effort_limit=None
+        )
+    },
+)
+
 '''
 body_mass
 
 ['Pelvis',
 'L_Hip',
-'R_Hip', 
-'Torso', 
-'L_Knee', 
-'R_Knee', 
-'Spine', 
-'L_Ankle', 
-'R_Ankle', 
-'Chest', 
-'L_Toe', 
-'R_Toe', 
-'Neck', 
-'L_Thorax', 
-'R_Thorax', 
-'Head', 
-L_Shoulder', 
-'R_Shoulder', 
-'L_Elbow', 
-'R_Elbow', 
-'L_Wrist', 
+'R_Hip',
+'Torso',
+'L_Knee',
+'R_Knee',
+'Spine',
+'L_Ankle',
+'R_Ankle',
+'Chest',
+'L_Toe',
+'R_Toe',
+'Neck',
+'L_Thorax',
+'R_Thorax',
+'Head',
+L_Shoulder',
+'R_Shoulder',
+'L_Elbow',
+'R_Elbow',
+'L_Wrist',
 'R_Wrist', 'L_Hand', 'R_Hand']
 
 smpl

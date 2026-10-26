@@ -14,7 +14,7 @@ configurations to spawn different types of meshes. Based on the configuration, t
 
 .. note::
     While rigid body properties can be set on a mesh, it is recommended to use the
-    :mod:`omni.isaac.lab.sim.spawners.shapes` module to spawn rigid bodies. This is because USD shapes
+    :mod:`isaaclab.sim.spawners.shapes` module to spawn rigid bodies. This is because USD shapes
     are more optimized for physics simulations.
 
 .. _USDGeomMesh: https://openusd.org/release/api/class_usd_geom_mesh.html

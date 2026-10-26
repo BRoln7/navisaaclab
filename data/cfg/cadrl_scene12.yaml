@@ -1,0 +1,23 @@
+training:
+  train: true
+  checkpoint: null
+
+env:
+  task: Isaac-Cadrl-Scene12
+  method: Cadrl
+  num_envs: 32
+  num_robots: 8
+  pedestrian_speed: 1.0
+  pedestrian_speed_variation: 0.10
+  fast_pedestrian_probability: 0.20
+  fast_pedestrian_speed: 1.35
+  fast_pedestrian_speed_variation: 0.10
+  pedestrian_acceleration_max: 2.0
+  pedestrian_turn_rate_max: 2.0
+  map_dilation: 7
+  pedestrian_policy: data/checkpoints/policy.pth
+  pedestrian_visual_asset: data/usd/assets/people/tailornet_smpl_female.usd
+  pedestrian_visual_update_interval: 1
+  hide_pedestrian_physics_visuals: true
+  debug_vis: true
+  log_name: cadrl-scene12

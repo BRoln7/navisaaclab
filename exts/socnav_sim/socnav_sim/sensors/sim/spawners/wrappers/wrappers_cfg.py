@@ -5,9 +5,9 @@
 
 from dataclasses import MISSING
 
-from omni.isaac.lab.sim.spawners.from_files import UsdFileCfg
-from omni.isaac.lab.sim.spawners.spawner_cfg import DeformableObjectSpawnerCfg, RigidObjectSpawnerCfg, SpawnerCfg
-from omni.isaac.lab.utils import configclass
+from isaaclab.sim.spawners.from_files import UsdFileCfg
+from isaaclab.sim.spawners.spawner_cfg import DeformableObjectSpawnerCfg, RigidObjectSpawnerCfg, SpawnerCfg
+from isaaclab.utils import configclass
 
 from . import wrappers
 

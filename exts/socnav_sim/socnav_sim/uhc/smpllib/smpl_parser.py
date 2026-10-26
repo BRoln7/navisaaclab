@@ -7,6 +7,7 @@ import os.path as osp
 from smplx import SMPL as _SMPL
 from smplx import SMPLH as _SMPLH
 from smplx import SMPLX as _SMPLX
+from .legacy_smpl import load_smpl_data
 
 SMPL_BONE_ORDER_NAMES = [
     "Pelvis",
@@ -305,6 +306,9 @@ class SMPL_Parser(_SMPL):
             A dictionary containing the indices of the extra vertices that
             will be selected
         """
+        if kwargs.get("data_struct") is None:
+            model_path = args[0] if args else kwargs["model_path"]
+            kwargs["data_struct"] = load_smpl_data(model_path, kwargs.get("gender", "neutral"))
         super(SMPL_Parser, self).__init__(*args, **kwargs)
         self.device = next(self.parameters()).device
         self.joint_names = SMPL_BONE_ORDER_NAMES

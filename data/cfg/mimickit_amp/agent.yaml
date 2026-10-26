@@ -1,0 +1,16 @@
+base: third_party/MimicKit/data/agents/amp_smpl_agent.yaml
+symmetry_weight: 2.0 # 1.0
+symmetry_scale: 50.0
+# All learning parameters, including task/style weights (0/1), logical batch
+# ratios (4/2/2) and replay capacity (200000), inherit the official SMPL preset.
+# Chunk native demo FK, normalization and replay insertion; this is independent
+# of environment count and optimizer minibatches. Demo/replay storage is on CPU.
+data_batch_size: 4096
+# Split backward passes, never the logical optimizer batch. At 16384 envs this
+# preserves upstream's 40 actor / 32 critic / 32 discriminator updates per iter.
+optimizer_microbatch_size:
+  actor: 16384
+  critic: 8192
+  disc: 4096
+disc_eval_batch_size: 4096
+critic_eval_batch_size: 4096
