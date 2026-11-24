@@ -9,6 +9,9 @@
 [![Project Website](https://img.shields.io/badge/Project-Website-2563EB?logo=github&logoColor=white)](https://broln7.github.io/NavIsaacLab-web/)
 [![Dataset](https://img.shields.io/badge/Hugging%20Face-Dataset-FFD21E?logo=huggingface&logoColor=black)](https://huggingface.co/datasets/hill77/NavIsaacLab_assets)
 
+> 🎉 Our paper has been accepted by **IEEE Transactions on Automation Science
+> and Engineering (T-ASE)**!
+
 NavIsaacLab is an Isaac Lab simulator for robot navigation among physically
 simulated pedestrians. Pedestrians use a PACER-style trajectory task trained
 with [MimicKit](https://github.com/xbpeng/MimicKit), SMPL motion data, AMP style
